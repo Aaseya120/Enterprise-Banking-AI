@@ -28,6 +28,7 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 @Configuration
 @EnableWebFluxSecurity
 @Profile("!keycloak")
+@SuppressWarnings("null")
 public class DemoModeSecurityConfig {
 
     @Bean

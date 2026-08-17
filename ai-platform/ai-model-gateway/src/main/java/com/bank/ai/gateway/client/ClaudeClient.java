@@ -14,6 +14,7 @@ import java.util.Map;
  * Calls the Anthropic Messages API. Falls back to a deterministic demo
  * response when no API key is configured, same as OpenAiClient/GeminiClient.
  */
+@SuppressWarnings("null")
 public class ClaudeClient extends AbstractAiModelClient {
 
     private final WebClient webClient;

@@ -30,6 +30,7 @@ import java.util.Map;
  * audit trail regardless of outcome.
  */
 @Service
+@SuppressWarnings("null")
 public class CustomerService {
 
     private final CustomerRepository customerRepository;

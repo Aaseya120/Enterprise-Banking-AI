@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
+@SuppressWarnings("null")
 public class KafkaProducerConfig {
 
     // -----------------------------------------------------------------------

@@ -41,6 +41,7 @@ import java.util.UUID;
  * AuditEventMessage to banking.audit.events via AuditEventPublisher.
  */
 @Service
+@SuppressWarnings("null")
 public class PaymentApplicationService {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentApplicationService.class);

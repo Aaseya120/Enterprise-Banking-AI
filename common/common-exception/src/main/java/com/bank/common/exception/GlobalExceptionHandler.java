@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * component-scans com.bank.* so it is picked up automatically.
  */
 @RestControllerAdvice
+@SuppressWarnings("null")
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)

@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
  * final until a human calls /review.
  */
 @Service
+@SuppressWarnings("null")
 public class DocumentIntelligenceService {
 
     private final DocumentClassifier classifier;

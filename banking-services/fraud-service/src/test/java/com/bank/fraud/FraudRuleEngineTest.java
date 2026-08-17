@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(classes = FraudServiceApplication.class)
+@SuppressWarnings("null")
 class FraudRuleEngineTest {
 
     @Autowired

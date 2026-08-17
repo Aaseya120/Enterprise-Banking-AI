@@ -16,6 +16,7 @@ import java.util.Map;
 
 @Configuration
 @EnableKafka
+@SuppressWarnings("null")
 public class KafkaConsumerConfig {
 
     @Bean

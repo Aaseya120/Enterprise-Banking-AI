@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @Configuration
+@SuppressWarnings("null")
 public class DownstreamClientsConfig {
 
     @Bean

@@ -16,6 +16,7 @@ import java.util.Map;
  * falls back to a deterministic demo response so the rest of the platform
  * (orchestrator, RAG, MCP) is runnable end-to-end without live credentials.
  */
+@SuppressWarnings("null")
 public class OpenAiClient extends AbstractAiModelClient {
 
     private final WebClient webClient;

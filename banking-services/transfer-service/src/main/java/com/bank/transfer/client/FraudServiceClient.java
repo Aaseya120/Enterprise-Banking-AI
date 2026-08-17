@@ -18,6 +18,7 @@ import java.util.Map;
  * still a second line of defence).
  */
 @Component
+@SuppressWarnings("null")
 public class FraudServiceClient {
 
     private static final Logger log = LoggerFactory.getLogger(FraudServiceClient.class);

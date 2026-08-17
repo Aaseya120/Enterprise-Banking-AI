@@ -40,6 +40,7 @@ import java.util.List;
 @Configuration
 @EnableWebFluxSecurity
 @Profile("keycloak")
+@SuppressWarnings("null")
 public class KeycloakSecurityConfig {
 
     @Bean

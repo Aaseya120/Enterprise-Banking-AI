@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Component
 @Qualifier("inMemory")
+@SuppressWarnings("null")
 public class InMemoryVectorStore implements VectorStore {
 
     private final Map<String, DocumentChunkRecord> store = new ConcurrentHashMap<>();

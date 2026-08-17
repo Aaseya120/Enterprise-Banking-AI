@@ -29,6 +29,7 @@ import java.util.Map;
  * KnowledgeDocumentService javadoc.
  */
 @Component
+@SuppressWarnings("null")
 public class RagIngestionClient {
 
     private static final Logger log = LoggerFactory.getLogger(RagIngestionClient.class);

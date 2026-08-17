@@ -19,6 +19,7 @@ import java.util.Map;
  * occurredAt) so safe retries by Kafka's producer retry mechanism are fine.
  */
 @Component
+@SuppressWarnings("null")
 public class AuditEventPublisher {
 
     static final String TOPIC = "banking.audit.events";

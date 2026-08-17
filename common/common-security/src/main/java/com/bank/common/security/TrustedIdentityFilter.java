@@ -33,10 +33,11 @@ import java.util.List;
  */
 @Component
 @Order(2)
+@SuppressWarnings("null")
 public class TrustedIdentityFilter extends OncePerRequestFilter {
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+    protected void doFilterInternal(@org.springframework.lang.NonNull HttpServletRequest request, @org.springframework.lang.NonNull HttpServletResponse response, @org.springframework.lang.NonNull FilterChain chain)
             throws ServletException, IOException {
         String userId = request.getHeader(SecurityHeaders.USER_ID);
         String rolesHeader = request.getHeader(SecurityHeaders.USER_ROLES);

@@ -17,6 +17,7 @@ import org.springframework.web.reactive.function.client.WebClient;
  * the decision (see its javadoc for the shared-secret caveat).
  */
 @Component
+@SuppressWarnings("null")
 public class TransferServiceClient {
 
     private final WebClient webClient;

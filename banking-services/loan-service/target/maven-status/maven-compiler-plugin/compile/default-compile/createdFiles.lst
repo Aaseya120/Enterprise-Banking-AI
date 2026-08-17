@@ -1,9 +1,0 @@
-com\bank\loan\dto\RepayLoanRequest.class
-com\bank\loan\controller\LoanController.class
-com\bank\loan\dto\ApplyLoanRequest.class
-com\bank\loan\domain\LoanRepository.class
-com\bank\loan\domain\LoanStatus.class
-com\bank\loan\dto\LoanResponse.class
-com\bank\loan\LoanServiceApplication.class
-com\bank\loan\application\LoanApplicationService.class
-com\bank\loan\domain\Loan.class

@@ -21,6 +21,7 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 @EnableMethodSecurity
 @Configuration
+@SuppressWarnings("null")
 public class DownstreamSecurityConfig {
 
     @Bean

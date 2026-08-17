@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
  */
 @AutoConfiguration
 @EnableConfigurationProperties(AiProviderProperties.class)
+@SuppressWarnings("null")
 public class AiModelGatewayAutoConfiguration {
 
     @Bean

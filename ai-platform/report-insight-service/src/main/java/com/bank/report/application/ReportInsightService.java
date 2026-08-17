@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
  * model was and wasn't shown.
  */
 @Service
+@SuppressWarnings("null")
 public class ReportInsightService {
 
     private final MetricsAggregationService metricsAggregationService;

@@ -12,6 +12,7 @@ import org.springframework.web.reactive.function.client.WebClient;
  * repo's individual `mvn spring-boot:run` setup.
  */
 @Configuration
+@SuppressWarnings("null")
 public class DownstreamClientsConfig {
 
     @Bean

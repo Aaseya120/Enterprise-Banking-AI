@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
  * see the fallback methods below.
  */
 @Service
+@SuppressWarnings("null")
 public class AiOrchestratorService {
 
     private static final String SYSTEM_PROMPT =

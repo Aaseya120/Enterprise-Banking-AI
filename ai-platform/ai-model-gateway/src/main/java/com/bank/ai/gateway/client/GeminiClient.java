@@ -14,6 +14,7 @@ import java.util.Map;
  * Calls the Gemini generateContent API. Falls back to a deterministic demo
  * response when no API key is configured.
  */
+@SuppressWarnings("null")
 public class GeminiClient extends AbstractAiModelClient {
 
     private final WebClient webClient;

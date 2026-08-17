@@ -30,6 +30,7 @@ import java.util.List;
  * manually by calling rag-service's POST /api/v1/rag/documents directly.
  */
 @Service
+@SuppressWarnings("null")
 public class KnowledgeDocumentService {
 
     private final KnowledgeDocumentRepository documentRepository;

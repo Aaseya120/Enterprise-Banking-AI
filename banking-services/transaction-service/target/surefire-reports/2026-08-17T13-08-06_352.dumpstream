@@ -1,5 +1,0 @@
-# Created at 2026-08-17T13:13:49.553
-Boot Manifest-JAR contains absolute paths in classpath 'D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\transaction-service\target\test-classes'
-Hint: <argLine>-Djdk.net.URLClassPath.disableClassPathURLCheck=true</argLine>
-'other' has different root
-

@@ -38,6 +38,7 @@ import java.util.Map;
  * that is documented as a known gap.
  */
 @Service
+@SuppressWarnings("null")
 public class LoanApplicationService {
 
     // Demo eligibility thresholds by loan type.

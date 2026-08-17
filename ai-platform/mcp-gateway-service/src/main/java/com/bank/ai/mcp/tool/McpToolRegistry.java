@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
  * section 27.
  */
 @Component
+@SuppressWarnings("null")
 public class McpToolRegistry {
 
     private final Map<String, McpTool> toolsByName;

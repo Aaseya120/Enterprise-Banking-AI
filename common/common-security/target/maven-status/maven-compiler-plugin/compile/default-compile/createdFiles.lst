@@ -1,6 +1,0 @@
-com\bank\common\security\config\DownstreamSecurityConfig.class
-com\bank\common\security\jwt\JwtSupport.class
-com\bank\common\security\PiiMasker.class
-com\bank\common\security\CorrelationIdFilter.class
-com\bank\common\security\SecurityHeaders.class
-com\bank\common\security\TrustedIdentityFilter.class

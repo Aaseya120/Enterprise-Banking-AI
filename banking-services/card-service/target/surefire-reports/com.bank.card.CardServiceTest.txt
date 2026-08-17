@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.bank.card.CardServiceTest
--------------------------------------------------------------------------------
-Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 17.86 s -- in com.bank.card.CardServiceTest

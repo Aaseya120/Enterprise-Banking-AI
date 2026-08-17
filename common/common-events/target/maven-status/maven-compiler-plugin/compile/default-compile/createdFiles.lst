@@ -1,3 +1,0 @@
-com\bank\common\events\AuditEventMessage.class
-com\bank\common\events\AuditEventPublisher.class
-com\bank\common\events\DomainEvent.class

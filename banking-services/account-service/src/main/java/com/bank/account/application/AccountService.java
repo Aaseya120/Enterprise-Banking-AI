@@ -27,6 +27,7 @@ import java.util.UUID;
  * ACCOUNT_CREDITED are published to banking.audit.events on every write.
  */
 @Service
+@SuppressWarnings("null")
 public class AccountService {
 
     private final AccountRepository accountRepository;

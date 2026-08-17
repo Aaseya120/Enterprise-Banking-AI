@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Set;
 
 @Component
+@SuppressWarnings("null")
 public class RagServiceClient {
 
     private final WebClient webClient;

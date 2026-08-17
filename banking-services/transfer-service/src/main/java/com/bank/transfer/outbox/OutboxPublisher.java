@@ -19,6 +19,7 @@ import java.util.List;
  * DEAD_LETTER for manual/ops investigation rather than retrying forever.
  */
 @Component
+@SuppressWarnings("null")
 public class OutboxPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(OutboxPublisher.class);

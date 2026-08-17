@@ -37,6 +37,7 @@ import java.util.UUID;
  * AuditEventMessage to banking.audit.events.
  */
 @Service
+@SuppressWarnings("null")
 public class TransferApplicationService {
 
     private static final Logger log = LoggerFactory.getLogger(TransferApplicationService.class);

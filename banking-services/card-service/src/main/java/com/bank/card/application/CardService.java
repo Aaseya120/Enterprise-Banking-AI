@@ -22,6 +22,7 @@ import java.util.Map;
  * trail signal-to-noise ratio high.
  */
 @Service
+@SuppressWarnings("null")
 public class CardService {
 
     private final CardRepository cardRepository;

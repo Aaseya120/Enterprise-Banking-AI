@@ -22,6 +22,7 @@ import java.util.Map;
  * applied to transfers after they are already in PENDING_FRAUD_REVIEW state.
  */
 @Component
+@SuppressWarnings("null")
 public class FraudServiceClient {
 
     private static final Logger log = LoggerFactory.getLogger(FraudServiceClient.class);
