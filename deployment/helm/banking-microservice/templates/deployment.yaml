@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "banking-microservice.fullname" . }}
+  labels:
+    {{- include "banking-microservice.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "banking-microservice.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0          # never take a pod offline before a new one is ready
+      maxSurge: 1                # spin up one extra pod, wait for readiness, then proceed
+  template:
+    metadata:
+      labels:
+        {{- include "banking-microservice.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Force pod restart when the ConfigMap or Secret checksum changes —
+        # without this Helm upgrades to config won't restart pods.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "banking-microservice.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      # Terminate gracefully: Spring Boot shuts down in ~30s by default.
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: {{ include "banking-microservice.portName" . }}
+              containerPort: {{ .Values.containerPort }}
+              protocol: TCP
+            - name: management
+              containerPort: {{ .Values.managementPort }}
+              protocol: TCP
+          # Liveness: if this fails, Kubernetes restarts the pod.
+          # We give Spring Boot extra time to start (initialDelaySeconds).
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          # Readiness: if this fails, the pod is removed from the Service
+          # endpoints (stops receiving traffic) but is NOT restarted.
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "banking-microservice.fullname" . }}
+          env:
+            {{- toYaml .Values.env | nindent 12 }}
+            {{- if .Values.database.enabled }}
+            - name: SPRING_DATASOURCE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "banking-microservice.fullname" . }}
+                  key: SPRING_DATASOURCE_URL
+            - name: SPRING_DATASOURCE_USERNAME
+              value: {{ .Values.database.username | quote }}
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.database.existingSecret }}{{ .Values.database.existingSecret }}{{ else }}{{ include "banking-microservice.fullname" . }}{{ end }}
+                  key: {{ .Values.database.secretKey }}
+            {{- end }}
+            {{- if .Values.kafka.enabled }}
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: {{ .Values.kafka.bootstrapServers | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            # Spring Boot writes nothing to disk by default; tmpfs /tmp lets
+            # the readOnlyRootFilesystem securityContext restriction hold.
+            - name: tmp
+              mountPath: /tmp
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

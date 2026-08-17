@@ -1,0 +1,449 @@
+version: "3.8"
+
+# Local dev / demo stack. All AI provider calls run in DEMO mode (no API
+# keys) unless you set the *_API_KEY env vars below and flip the
+# bank.ai.providers.*.enabled flags in ai-orchestrator-service's config.
+#
+# Run:  docker compose -f deployment/docker/docker-compose.yml up --build
+
+services:
+
+# Each microservice below gets its own dedicated PostgreSQL container --
+# not a shared instance. Every one of these Postgres processes listens on
+# the database's own standard/default port, 5432, exactly as requested;
+# that's what "5432" means inside each container's network namespace. What
+# CAN'T all be 5432 is the HOST-side port mapping -- 13 different processes
+# cannot simultaneously bind the same host port, so each is mapped to a
+# distinct host port below (5432, 5433, 5434, ...) purely so you can also
+# reach them individually from your laptop (e.g. `psql -h localhost -p 5433
+# -U postgres account_db`). Inside the docker-compose network, every
+# service reaches its database at "<service>-db:5432" -- see each service's
+# application.yml datasource.url, which uses exactly that hostname:port.
+
+  customer-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: customer_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+
+  account-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: account_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+
+  transfer-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: transfer_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+
+  payment-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
+
+  transaction-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: transaction_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5436:5432"
+
+  card-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: card_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5437:5432"
+
+  loan-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: loan_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5438:5432"
+
+  notification-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: notification_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5439:5432"
+
+  audit-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: audit_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5440:5432"
+
+  fraud-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: fraud_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5441:5432"
+
+  knowledge-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: knowledge_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5442:5432"
+
+  document-intel-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: document_intel_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5443:5432"
+
+  report-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: report_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5444:5432"
+
+  # --- Observability stack (Phase 12): Prometheus scrapes every service's
+  # /actuator/prometheus endpoint (see prometheus/prometheus.yml), Zipkin
+  # collects distributed traces (every service exports to it via
+  # management.zipkin.tracing.endpoint), Grafana visualizes both
+  # (Prometheus datasource auto-provisioned, see grafana/provisioning/) ---
+
+  # Keycloak (optional -- only needed for `docker compose --profile keycloak up`
+  # or when api-gateway is run with --spring.profiles.active=keycloak; the
+  # platform's default demo-JWT auth mode doesn't need this container at all).
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    command: ["start-dev", "--import-realm", "--http-port=8180"]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8180
+    volumes:
+      - ./keycloak/banking-realm.json:/opt/keycloak/data/import/banking-realm.json:ro
+    ports:
+      - "8180:8180"
+    profiles: ["keycloak"]
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  zipkin:
+    image: openzipkin/zipkin:2.24
+    ports:
+      - "9411:9411"
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    depends_on: [prometheus]
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    depends_on: [zookeeper]
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+
+  customer-service:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: banking-services/customer-service
+        JAR_NAME: customer-service
+    environment:
+      SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
+    ports:
+      - "8086:8086"
+    depends_on: [customer-db, kafka]
+
+  account-service:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: banking-services/account-service
+        JAR_NAME: account-service
+    environment:
+      SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
+    ports:
+      - "8081:8081"
+    depends_on: [account-db, kafka]
+
+  transfer-service:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: banking-services/transfer-service
+        JAR_NAME: transfer-service
+    environment:
+      SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
+      FRAUD_SERVICE_URL: http://fraud-service:8093
+    ports:
+      - "8084:8084"
+    depends_on: [kafka, transfer-db, fraud-service]
+
+  payment-service:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: banking-services/payment-service
+        JAR_NAME: payment-service
+    environment:
+      SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
+      FRAUD_SERVICE_URL: http://fraud-service:8093
+    ports:
+      - "8087:8087"
+    depends_on: [kafka, payment-db, fraud-service]
+
+  transaction-service:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: banking-services/transaction-service
+        JAR_NAME: transaction-service
+    environment:
+      SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
+    ports:
+      - "8088:8088"
+    depends_on: [kafka, transaction-db, payment-service, transfer-service]
+
+  card-service:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: banking-services/card-service
+        JAR_NAME: card-service
+    environment:
+      SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
+    ports:
+      - "8089:8089"
+    depends_on: [card-db, kafka]
+
+  loan-service:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: banking-services/loan-service
+        JAR_NAME: loan-service
+    environment:
+      SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
+    ports:
+      - "8090:8090"
+    depends_on: [loan-db, kafka]
+
+  notification-service:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: banking-services/notification-service
+        JAR_NAME: notification-service
+    environment:
+      SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
+    ports:
+      - "8091:8091"
+    depends_on: [kafka, notification-db]
+
+  audit-service:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: banking-services/audit-service
+        JAR_NAME: audit-service
+    environment:
+      SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
+    ports:
+      - "8092:8092"
+    depends_on: [audit-db, kafka]
+
+  fraud-service:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: banking-services/fraud-service
+        JAR_NAME: fraud-service
+    ports:
+      - "8093:8093"
+    depends_on: [fraud-db]
+
+  fraud-ai-service:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: ai-platform/fraud-ai-service
+        JAR_NAME: fraud-ai-service
+    environment:
+      SPRING_KAFKA_BOOTSTRAP-SERVERS: kafka:9092
+      BANK_SERVICES_TRANSFER-SERVICE_BASE-URL: http://transfer-service:8084
+    ports:
+      - "8085:8085"
+    depends_on: [kafka, transfer-service]
+
+  rag-service:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: ai-platform/rag-service
+        JAR_NAME: rag-service
+    ports:
+      - "8082:8082"
+
+  knowledge-service:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: ai-platform/knowledge-service
+        JAR_NAME: knowledge-service
+    environment:
+      RAG_SERVICE_URL: http://rag-service:8082
+    ports:
+      - "8094:8094"
+    depends_on: [knowledge-db, rag-service]
+
+  document-intelligence-service:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: ai-platform/document-intelligence-service
+        JAR_NAME: document-intelligence-service
+    ports:
+      - "8095:8095"
+    depends_on: [document-intel-db]
+
+  report-insight-service:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: ai-platform/report-insight-service
+        JAR_NAME: report-insight-service
+    environment:
+      BANK_SERVICES_TRANSACTION-SERVICE_BASE-URL: http://transaction-service:8088
+    ports:
+      - "8096:8096"
+    depends_on: [report-db, transaction-service]
+
+  mcp-gateway-service:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: ai-platform/mcp-gateway-service
+        JAR_NAME: mcp-gateway-service
+    environment:
+      BANK_SERVICES_ACCOUNT-SERVICE_BASE-URL: http://account-service:8081
+    ports:
+      - "8083:8083"
+    depends_on: [account-service]
+
+  ai-orchestrator-service:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: ai-platform/ai-orchestrator-service
+        JAR_NAME: ai-orchestrator-service
+    environment:
+      BANK_SERVICES_RAG-SERVICE_BASE-URL: http://rag-service:8082
+      BANK_SERVICES_MCP-GATEWAY-SERVICE_BASE-URL: http://mcp-gateway-service:8083
+      # BANK_AI_PROVIDERS_OPENAI_ENABLED: "true"
+      # BANK_AI_PROVIDERS_OPENAI_API-KEY: ${OPENAI_API_KEY}
+      # BANK_AI_PROVIDERS_CLAUDE_ENABLED: "true"
+      # BANK_AI_PROVIDERS_CLAUDE_API-KEY: ${ANTHROPIC_API_KEY}
+    ports:
+      - "8080:8080"
+    depends_on: [rag-service, mcp-gateway-service]
+
+  api-gateway:
+    build:
+      context: ../../
+      dockerfile: deployment/docker/Dockerfile
+      args:
+        MODULE_PATH: infrastructure/api-gateway
+        JAR_NAME: api-gateway
+    ports:
+      - "8000:8000"
+    depends_on:
+      - customer-service
+      - account-service
+      - transfer-service
+      - payment-service
+      - transaction-service
+      - card-service
+      - loan-service
+      - notification-service
+      - audit-service
+      - fraud-service
+      - fraud-ai-service
+      - ai-orchestrator-service
+      - rag-service
+      - knowledge-service
+      - document-intelligence-service
+      - report-insight-service
+      - mcp-gateway-service

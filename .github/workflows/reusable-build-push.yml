@@ -1,0 +1,97 @@
+# .github/workflows/reusable-build-push.yml
+#
+# Reusable workflow: build one service's Docker image and push to ECR.
+# Called by ci.yml once per changed service.
+#
+# Inputs:
+#   service         — service name matching the docker-compose MODULE_PATH convention
+#   module_path     — Maven module path (e.g., banking-services/account-service)
+#   jar_name        — Spring Boot jar name (e.g., account-service)
+#   ecr_repo        — full ECR repository URL (from terraform output)
+#   aws_region      — AWS region
+#   image_tag       — image tag to push (usually git SHA)
+
+name: Reusable — Build and Push to ECR
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        required: true
+        type: string
+      module_path:
+        required: true
+        type: string
+      jar_name:
+        required: true
+        type: string
+      ecr_repo:
+        required: true
+        type: string
+      aws_region:
+        required: true
+        type: string
+        default: us-east-1
+      image_tag:
+        required: true
+        type: string
+    secrets:
+      AWS_ROLE_ARN:
+        required: true
+
+jobs:
+  build-and-push:
+    name: Build & push ${{ inputs.service }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # required for OIDC-based AWS assume-role
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Login to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx (for layer caching)
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deployment/docker/Dockerfile
+          build-args: |
+            MODULE_PATH=${{ inputs.module_path }}
+            JAR_NAME=${{ inputs.jar_name }}
+          push: true
+          tags: |
+            ${{ inputs.ecr_repo }}:${{ inputs.image_tag }}
+            ${{ inputs.ecr_repo }}:latest
+          cache-from: type=registry,ref=${{ inputs.ecr_repo }}:cache
+          cache-to: type=registry,ref=${{ inputs.ecr_repo }}:cache,mode=max
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ inputs.ecr_repo }}:${{ inputs.image_tag }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          # Don't fail the build on findings — report only.
+          # Change exit-code to 1 to enforce a hard gate.
+          exit-code: "0"
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif

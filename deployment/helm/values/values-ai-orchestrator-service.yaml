@@ -1,0 +1,62 @@
+# values-ai-orchestrator-service.yaml
+nameOverride: ai-orchestrator-service
+fullnameOverride: ai-orchestrator-service
+
+image:
+  repository: # <account>.dkr.ecr.<region>.amazonaws.com/ai-orchestrator-service
+  tag: latest
+
+containerPort: 8080
+managementPort: 8081
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+database:
+  enabled: false
+
+kafka:
+  enabled: false
+
+extraEnv:
+  - name: BANK_SERVICES_RAG_SERVICE_BASE_URL
+    value: "http://rag-service"
+  - name: BANK_SERVICES_MCP_GATEWAY_SERVICE_BASE_URL
+    value: "http://mcp-gateway-service"
+  # AI provider API keys — set via ExternalSecrets from Secrets Manager in prod.
+  # Leave blank to run in demo mode (no real LLM calls).
+  - name: BANK_AI_PROVIDERS_OPENAI_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: ai-orchestrator-api-keys
+        key: openai-api-key
+        optional: true
+  - name: BANK_AI_PROVIDERS_CLAUDE_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: ai-orchestrator-api-keys
+        key: claude-api-key
+        optional: true
+  - name: BANK_AI_PROVIDERS_GEMINI_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: ai-orchestrator-api-keys
+        key: gemini-api-key
+        optional: true
+
+replicaCount: 2
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 8
+  # AI inference calls are CPU-heavy
+  targetCPUUtilizationPercentage: 60
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "2000m"
+    memory: "2Gi"

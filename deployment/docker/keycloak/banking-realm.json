@@ -1,0 +1,64 @@
+{
+  "realm": "banking",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "roles": {
+    "realm": [
+      { "name": "CUSTOMER", "description": "Retail banking customer" },
+      { "name": "BANK_STAFF", "description": "Customer support / account operations" },
+      { "name": "ANALYST", "description": "Reporting and analytics" },
+      { "name": "COMPLIANCE_OFFICER", "description": "Audit, compliance, AML, decrypting sensitive PII" },
+      { "name": "ADMIN", "description": "Administrative operations" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "banking-gateway",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["*"]
+    }
+  ],
+  "users": [
+    {
+      "username": "customer1",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+      "realmRoles": ["CUSTOMER"]
+    },
+    {
+      "username": "staff1",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+      "realmRoles": ["BANK_STAFF"]
+    },
+    {
+      "username": "analyst1",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+      "realmRoles": ["ANALYST"]
+    },
+    {
+      "username": "compliance1",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+      "realmRoles": ["COMPLIANCE_OFFICER"]
+    },
+    {
+      "username": "admin1",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "password", "temporary": false }],
+      "realmRoles": ["ADMIN"]
+    }
+  ]
+}

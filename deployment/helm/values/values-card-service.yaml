@@ -1,0 +1,40 @@
+# values-card-service.yaml
+nameOverride: card-service
+fullnameOverride: card-service
+
+image:
+  repository: # <account>.dkr.ecr.<region>.amazonaws.com/card-service
+  tag: latest
+
+containerPort: 8089
+managementPort: 8090
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8089
+
+database:
+  enabled: true
+  host: ""    # card-db.xxxx.us-east-1.rds.amazonaws.com
+  port: 5432
+  name: card_db
+  username: postgres
+  existingSecret: "card-service-db-secret"
+  secretKey: "db-password"
+
+kafka:
+  enabled: false
+
+replicaCount: 2
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 6
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"

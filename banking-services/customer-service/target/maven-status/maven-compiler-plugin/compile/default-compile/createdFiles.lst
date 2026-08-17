@@ -1,0 +1,10 @@
+com\bank\customer\application\CustomerService.class
+com\bank\customer\dto\UpdateKycStatusRequest.class
+com\bank\customer\controller\CustomerController.class
+com\bank\customer\domain\CustomerRepository.class
+com\bank\customer\dto\CustomerResponse.class
+com\bank\customer\CustomerServiceApplication.class
+com\bank\customer\domain\Customer.class
+com\bank\customer\domain\KycStatus.class
+com\bank\customer\dto\NationalIdResponse.class
+com\bank\customer\dto\RegisterCustomerRequest.class

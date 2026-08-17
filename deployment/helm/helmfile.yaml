@@ -1,0 +1,198 @@
+# helmfile.yaml — full-stack install/upgrade for all 19 services.
+#
+# Usage:
+#   helmfile sync                        # install/upgrade everything
+#   helmfile apply                       # like sync but only changes
+#   helmfile -l name=account-service apply  # single service
+#   helmfile -e prod sync               # production environment
+#
+# Prerequisites:
+#   brew install helmfile helm
+#   helmfile init   # installs helm-diff and helm-secrets plugins
+#
+# Environment precedence: dev (default), staging, prod.
+# prod overrides use larger instance types and higher replica counts.
+# Pass environment with: helmfile -e prod sync
+
+environments:
+  dev:
+    values:
+      - environments/dev/values.yaml
+  staging:
+    values:
+      - environments/staging/values.yaml
+  prod:
+    values:
+      - environments/prod/values.yaml
+
+---
+# Chart path (relative to this helmfile.yaml)
+repositories: []   # chart is local, no remote repo needed
+
+helmDefaults:
+  wait: true             # wait for pods to be Ready before moving to next release
+  waitForJobs: true
+  timeout: 300           # 5-minute timeout per service
+  recreatePods: false    # rolling update, not kill-all-restart
+  cleanupOnFail: true
+
+releases:
+  # ─── Infrastructure / observability (no dependency on app services) ──────
+
+  # These are not managed by this helmfile (they're external Helm charts
+  # installed separately into the monitoring namespace):
+  #   prometheus-community/kube-prometheus-stack (Prometheus + Grafana + Alertmanager)
+  #   openzipkin/zipkin
+  # See infrastructure/terraform/ for their Terraform-based deployment.
+
+  # ─── Stateless services with no upstream app dependencies ────────────────
+
+  - name: rag-service
+    chart: ./banking-microservice
+    namespace: banking
+    createNamespace: true
+    values:
+      - values/values-rag-service.yaml
+
+  - name: account-service
+    chart: ./banking-microservice
+    namespace: banking
+    values:
+      - values/values-account-service.yaml
+
+  - name: customer-service
+    chart: ./banking-microservice
+    namespace: banking
+    values:
+      - values/values-customer-service.yaml
+
+  - name: card-service
+    chart: ./banking-microservice
+    namespace: banking
+    values:
+      - values/values-card-service.yaml
+
+  - name: loan-service
+    chart: ./banking-microservice
+    namespace: banking
+    values:
+      - values/values-loan-service.yaml
+
+  - name: audit-service
+    chart: ./banking-microservice
+    namespace: banking
+    values:
+      - values/values-audit-service.yaml
+
+  - name: fraud-service
+    chart: ./banking-microservice
+    namespace: banking
+    values:
+      - values/values-fraud-service.yaml
+
+  - name: knowledge-service
+    chart: ./banking-microservice
+    namespace: banking
+    values:
+      - values/values-knowledge-service.yaml
+
+  - name: document-intelligence-service
+    chart: ./banking-microservice
+    namespace: banking
+    values:
+      - values/values-document-intelligence-service.yaml
+
+  # ─── Kafka-dependent services (Kafka/MSK must be ready first) ────────────
+  # Helmfile installs in declaration order with --wait between releases.
+  # Kafka is an external dependency (MSK in prod, docker-compose in dev) —
+  # its readiness is assumed before helmfile runs.
+
+  - name: transfer-service
+    chart: ./banking-microservice
+    namespace: banking
+    values:
+      - values/values-transfer-service.yaml
+    needs:
+      - banking/account-service   # account-service health checked before transfer starts
+
+  - name: payment-service
+    chart: ./banking-microservice
+    namespace: banking
+    values:
+      - values/values-payment-service.yaml
+
+  - name: transaction-service
+    chart: ./banking-microservice
+    namespace: banking
+    values:
+      - values/values-transaction-service.yaml
+    needs:
+      - banking/payment-service
+      - banking/transfer-service
+
+  - name: notification-service
+    chart: ./banking-microservice
+    namespace: banking
+    values:
+      - values/values-notification-service.yaml
+
+  # ─── AI services ──────────────────────────────────────────────────────────
+
+  - name: fraud-ai-service
+    chart: ./banking-microservice
+    namespace: banking
+    values:
+      - values/values-fraud-ai-service.yaml
+    needs:
+      - banking/transfer-service   # calls back to transfer-service on fraud decision
+
+  - name: mcp-gateway-service
+    chart: ./banking-microservice
+    namespace: banking
+    values:
+      - values/values-mcp-gateway-service.yaml
+    needs:
+      - banking/account-service
+
+  - name: ai-orchestrator-service
+    chart: ./banking-microservice
+    namespace: banking
+    values:
+      - values/values-ai-orchestrator-service.yaml
+    needs:
+      - banking/rag-service
+      - banking/mcp-gateway-service
+
+  - name: report-insight-service
+    chart: ./banking-microservice
+    namespace: banking
+    values:
+      - values/values-report-insight-service.yaml
+    needs:
+      - banking/transaction-service
+
+  # ─── API Gateway (last — waits for all upstreams) ─────────────────────────
+
+  - name: api-gateway
+    chart: ./banking-microservice
+    namespace: banking
+    values:
+      - values/values-api-gateway.yaml
+    needs:
+      - banking/customer-service
+      - banking/account-service
+      - banking/transfer-service
+      - banking/payment-service
+      - banking/transaction-service
+      - banking/card-service
+      - banking/loan-service
+      - banking/notification-service
+      - banking/audit-service
+      - banking/fraud-service
+      - banking/fraud-ai-service
+      - banking/rag-service
+      - banking/knowledge-service
+      - banking/document-intelligence-service
+      - banking/report-insight-service
+      - banking/mcp-gateway-service
+      - banking/ai-orchestrator-service

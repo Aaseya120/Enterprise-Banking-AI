@@ -1,0 +1,20 @@
+# CODEOWNERS — reviewed on every PR.
+# Syntax: <pattern> @<owner>
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Platform team owns everything by default
+*                                   @platform-team
+
+# Security-sensitive paths: require security-team approval on any change
+common/common-crypto/**             @security-team @platform-team
+common/common-security/**           @security-team @platform-team
+infrastructure/api-gateway/src/main/java/com/bank/gateway/security/**  @security-team @platform-team
+banking-services/customer-service/src/main/java/com/bank/customer/**   @security-team @platform-team
+
+# Infrastructure: require infra team approval on Terraform and Helm changes
+infrastructure/terraform/**         @infra-team @platform-team
+deployment/helm/**                  @infra-team @platform-team
+.github/workflows/**                @infra-team @platform-team
+
+# AI platform: require ai-team approval on AI service changes
+ai-platform/**                      @ai-team @platform-team

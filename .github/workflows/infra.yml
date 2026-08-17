@@ -1,0 +1,149 @@
+# .github/workflows/infra.yml
+#
+# Infrastructure pipeline: Terraform plan on PR, apply on merge to main.
+# Only triggered when files under infrastructure/terraform/** change.
+#
+# Secrets required:
+#   AWS_INFRA_ROLE_ARN      — IAM role with broad Terraform permissions
+#   TF_VAR_RDS_MASTER_PASSWORD
+#   TF_VAR_JWT_SIGNING_KEY
+#   TF_VAR_ENCRYPTION_PASSPHRASE
+#   TF_VAR_FRAUD_DECISION_HMAC_SECRET
+#
+# Repository variables:
+#   AWS_REGION              — e.g., us-east-1
+#   TF_ENVIRONMENT          — dev or prod (which tfvars file to use)
+
+name: Infrastructure (Terraform)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infrastructure/terraform/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'infrastructure/terraform/**'
+
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: false  # never cancel an in-flight apply
+
+env:
+  TF_WORKING_DIR: infrastructure/terraform
+  TF_ENV: ${{ vars.TF_ENVIRONMENT || 'dev' }}
+
+jobs:
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write    # to post plan output as a PR comment
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_INFRA_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.8.5"
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -input=false
+
+      - name: Terraform Validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_rds_master_password:         ${{ secrets.TF_VAR_RDS_MASTER_PASSWORD }}
+          TF_VAR_jwt_signing_key:             ${{ secrets.TF_VAR_JWT_SIGNING_KEY }}
+          TF_VAR_encryption_passphrase:       ${{ secrets.TF_VAR_ENCRYPTION_PASSPHRASE }}
+          TF_VAR_fraud_decision_hmac_secret:  ${{ secrets.TF_VAR_FRAUD_DECISION_HMAC_SECRET }}
+        run: |
+          terraform plan \
+            -var-file="environments/${{ env.TF_ENV }}/terraform.tfvars" \
+            -input=false \
+            -out=tfplan \
+            -no-color 2>&1 | tee plan-output.txt
+
+      - name: Comment plan on PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('${{ env.TF_WORKING_DIR }}/plan-output.txt', 'utf8');
+            const truncated = plan.length > 60000
+              ? plan.substring(0, 60000) + '\n\n... (truncated — see workflow logs for full output)'
+              : plan;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Terraform Plan (\`${{ env.TF_ENV }}\`)\n\`\`\`hcl\n${truncated}\n\`\`\``
+            });
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: ${{ env.TF_WORKING_DIR }}/tfplan
+          retention-days: 1   # plan is only valid for this pipeline run
+
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: terraform-apply   # configure this GitHub Environment to require approval
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_INFRA_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.8.5"
+
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -input=false
+
+      - name: Terraform Apply
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_rds_master_password:         ${{ secrets.TF_VAR_RDS_MASTER_PASSWORD }}
+          TF_VAR_jwt_signing_key:             ${{ secrets.TF_VAR_JWT_SIGNING_KEY }}
+          TF_VAR_encryption_passphrase:       ${{ secrets.TF_VAR_ENCRYPTION_PASSPHRASE }}
+          TF_VAR_fraud_decision_hmac_secret:  ${{ secrets.TF_VAR_FRAUD_DECISION_HMAC_SECRET }}
+        run: terraform apply -input=false tfplan

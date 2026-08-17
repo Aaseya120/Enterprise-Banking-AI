@@ -1,0 +1,8 @@
+com\bank\ai\fraud\consumer\TransferEventListener.class
+com\bank\ai\fraud\model\RiskScore$RiskLevel.class
+com\bank\ai\fraud\model\RiskScore.class
+com\bank\ai\fraud\service\RiskScoringService.class
+com\bank\ai\fraud\config\JacksonConfig.class
+com\bank\ai\fraud\client\TransferServiceClient.class
+com\bank\ai\fraud\FraudAiServiceApplication.class
+com\bank\ai\fraud\config\KafkaConsumerConfig.class

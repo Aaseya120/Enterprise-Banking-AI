@@ -1,0 +1,40 @@
+# values-account-service.yaml
+nameOverride: account-service
+fullnameOverride: account-service
+
+image:
+  repository: # <account>.dkr.ecr.<region>.amazonaws.com/account-service
+  tag: latest
+
+containerPort: 8081
+managementPort: 8082
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8081
+
+database:
+  enabled: true
+  host: ""    # set to RDS endpoint: account-db.xxxx.us-east-1.rds.amazonaws.com
+  port: 5432
+  name: account_db
+  username: postgres
+  existingSecret: "account-service-db-secret"   # created by ExternalSecrets in prod
+  secretKey: "db-password"
+
+kafka:
+  enabled: false
+
+replicaCount: 2
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 6
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"

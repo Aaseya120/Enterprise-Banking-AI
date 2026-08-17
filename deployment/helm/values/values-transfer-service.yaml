@@ -1,0 +1,53 @@
+# values-transfer-service.yaml
+nameOverride: transfer-service
+fullnameOverride: transfer-service
+
+image:
+  repository: # <account>.dkr.ecr.<region>.amazonaws.com/transfer-service
+  tag: latest
+
+containerPort: 8084
+managementPort: 8085
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8084
+
+database:
+  enabled: true
+  host: ""    # transfer-db.xxxx.us-east-1.rds.amazonaws.com
+  port: 5432
+  name: transfer_db
+  username: postgres
+  existingSecret: "transfer-service-db-secret"
+  secretKey: "db-password"
+
+kafka:
+  enabled: true
+  bootstrapServers: ""  # set to MSK bootstrap endpoint in prod
+
+# HMAC secret shared with fraud-ai-service for the /fraud-decision callback.
+# Must be identical in both services' configs.
+extraEnv:
+  - name: BANK_CRYPTO_FRAUD_DECISION_HMAC_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: transfer-service-hmac-secret
+        key: fraud-decision-hmac-secret
+  - name: BANK_SERVICES_FRAUD_AI_SERVICE_BASE_URL
+    value: "http://fraud-ai-service"
+
+replicaCount: 2
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"

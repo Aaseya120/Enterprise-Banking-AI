@@ -1,0 +1,35 @@
+# values-rag-service.yaml
+nameOverride: rag-service
+fullnameOverride: rag-service
+
+image:
+  repository: # <account>.dkr.ecr.<region>.amazonaws.com/rag-service
+  tag: latest
+
+containerPort: 8082
+managementPort: 8083
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8082
+
+database:
+  enabled: false
+
+kafka:
+  enabled: false
+
+replicaCount: 2
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 6
+
+# RAG service holds embeddings in memory — needs more heap
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "2000m"
+    memory: "2Gi"

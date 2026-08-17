@@ -1,0 +1,218 @@
+# Default values for banking-microservice chart.
+# Every service inherits these and overrides only what it needs in its
+# own values-<service>.yaml file.
+
+# ---------------------------------------------------------------------------
+# Image
+# ---------------------------------------------------------------------------
+image:
+  # In CI/CD: overridden to <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/<service>:<sha>
+  repository: bank
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# ---------------------------------------------------------------------------
+# Service identity
+# ---------------------------------------------------------------------------
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  # IRSA: set to the Secrets Manager read-only role ARN in prod
+  # example: eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/bank-secrets-reader
+  name: ""
+
+# ---------------------------------------------------------------------------
+# Container port (the port the Spring Boot app listens on)
+# Each service overrides this. api-gateway=8000, ai-orchestrator=8080, etc.
+# ---------------------------------------------------------------------------
+containerPort: 8080
+
+# ---------------------------------------------------------------------------
+# Kubernetes Service (ClusterIP by default; only api-gateway uses LoadBalancer)
+# ---------------------------------------------------------------------------
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080   # must match containerPort
+
+# ---------------------------------------------------------------------------
+# Ingress (disabled by default; enabled only for api-gateway)
+# ---------------------------------------------------------------------------
+ingress:
+  enabled: false
+  className: "alb"
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /actuator/health
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:<region>:<account>:certificate/<id>
+  hosts:
+    - host: api.bank.internal
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# ---------------------------------------------------------------------------
+# Replicas and scaling
+# ---------------------------------------------------------------------------
+replicaCount: 2
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# ---------------------------------------------------------------------------
+# Resources
+# Requests = what Kubernetes schedules on; limits = max before OOM kill.
+# Services with high Kafka throughput or large heap (rag, ai-orchestrator)
+# should override these in their own values file.
+# ---------------------------------------------------------------------------
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
+
+# ---------------------------------------------------------------------------
+# Health probes
+# Spring Boot Actuator exposes /actuator/health/liveness and /readiness
+# since Spring Boot 2.3. These are the standard probe paths.
+# ---------------------------------------------------------------------------
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: management
+  initialDelaySeconds: 60
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: management
+  initialDelaySeconds: 45
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Management port (Spring Boot actuator; separate from the app port so
+# probes and Prometheus scraping don't consume app-tier connections)
+managementPort: 8081  # overridden per-service where actuator != app port + 1
+
+# ---------------------------------------------------------------------------
+# NetworkPolicy — default: allow ingress only from api-gateway and monitoring
+# ---------------------------------------------------------------------------
+networkPolicy:
+  enabled: true
+  # Set to the label selector of the api-gateway pod
+  allowFromGateway: true
+  # Set to the namespace where Prometheus runs so it can scrape /actuator/prometheus
+  monitoringNamespace: monitoring
+
+# ---------------------------------------------------------------------------
+# Spring Boot environment variables injected into the container.
+# Services add their own in their values-<service>.yaml.
+# ---------------------------------------------------------------------------
+env:
+  # Management port: expose actuator on a separate port from the app
+  # (matches server.port vs management.server.port in application.yml)
+  - name: MANAGEMENT_SERVER_PORT
+    value: "8081"
+  # Zipkin tracing — pod-local DNS name of the Zipkin service
+  - name: MANAGEMENT_ZIPKIN_TRACING_ENDPOINT
+    value: "http://zipkin:9411/api/v2/spans"
+  # Kubernetes-downward-API pod name for tracing context
+  - name: SPRING_APPLICATION_INSTANCE
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.name
+
+# ---------------------------------------------------------------------------
+# Database (disabled by default; each stateful service enables this)
+# ---------------------------------------------------------------------------
+database:
+  enabled: false
+  host: ""       # e.g., customer-db.xxxx.us-east-1.rds.amazonaws.com
+  port: 5432
+  name: ""       # e.g., customer_db
+  username: postgres
+  # Password comes from a Kubernetes Secret, not plaintext here
+  existingSecret: ""      # name of a pre-existing secret
+  secretKey: "db-password"
+
+# ---------------------------------------------------------------------------
+# Kafka (disabled by default; Kafka-consuming services enable this)
+# ---------------------------------------------------------------------------
+kafka:
+  enabled: false
+  bootstrapServers: "kafka:9092"
+
+# ---------------------------------------------------------------------------
+# Extra environment variables (service-specific; list of {name, value} or
+# {name, valueFrom} maps, same as the env list above)
+# ---------------------------------------------------------------------------
+extraEnv: []
+
+# ---------------------------------------------------------------------------
+# Extra volumes and mounts (e.g. for TLS certs or config files)
+# ---------------------------------------------------------------------------
+extraVolumes: []
+extraVolumeMounts: []
+
+# ---------------------------------------------------------------------------
+# Pod annotations (e.g. Prometheus scrape, Datadog, Vault agent)
+# ---------------------------------------------------------------------------
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/path: "/actuator/prometheus"
+  prometheus.io/port: "{{ .Values.managementPort }}"
+
+# ---------------------------------------------------------------------------
+# Pod security
+# ---------------------------------------------------------------------------
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# ---------------------------------------------------------------------------
+# Node scheduling
+# ---------------------------------------------------------------------------
+nodeSelector: {}
+tolerations: []
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - "{{ .Release.Name }}"
+          topologyKey: kubernetes.io/hostname

@@ -1,0 +1,40 @@
+# values-document-intelligence-service.yaml
+nameOverride: document-intelligence-service
+fullnameOverride: document-intelligence-service
+
+image:
+  repository: # <account>.dkr.ecr.<region>.amazonaws.com/document-intelligence-service
+  tag: latest
+
+containerPort: 8095
+managementPort: 8096
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8095
+
+database:
+  enabled: true
+  host: ""    # document-intel-db.xxxx.us-east-1.rds.amazonaws.com
+  port: 5432
+  name: document_intel_db
+  username: postgres
+  existingSecret: "document-intelligence-service-db-secret"
+  secretKey: "db-password"
+
+kafka:
+  enabled: false
+
+replicaCount: 2
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 6
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    cpu: "2000m"
+    memory: "1Gi"

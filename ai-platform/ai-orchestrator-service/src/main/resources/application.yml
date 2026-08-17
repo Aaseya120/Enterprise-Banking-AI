@@ -1,0 +1,48 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ai-orchestrator-service
+
+bank:
+  services:
+    rag-service:
+      base-url: http://localhost:8082
+    mcp-gateway-service:
+      base-url: http://localhost:8083
+  ai:
+    providers:
+      default-provider: OPENAI
+      fallback-provider: CLAUDE
+      openai:
+        enabled: false      # set true + provide api-key (via env/secret) to use a real model
+        model: gpt-4o
+      claude:
+        enabled: false
+        model: claude-sonnet-4-6
+      gemini:
+        enabled: false
+        model: gemini-2.5-pro
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers,circuitbreakerevents,prometheus
+  health:
+    circuitbreakers:
+      enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  pattern:
+    level: "%5p [%X{correlationId},%X{traceId:-},%X{spanId:-}]"

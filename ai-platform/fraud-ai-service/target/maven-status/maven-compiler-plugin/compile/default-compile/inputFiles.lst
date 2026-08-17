@@ -1,0 +1,7 @@
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\ai-platform\fraud-ai-service\src\main\java\com\bank\ai\fraud\client\TransferServiceClient.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\ai-platform\fraud-ai-service\src\main\java\com\bank\ai\fraud\config\JacksonConfig.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\ai-platform\fraud-ai-service\src\main\java\com\bank\ai\fraud\config\KafkaConsumerConfig.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\ai-platform\fraud-ai-service\src\main\java\com\bank\ai\fraud\consumer\TransferEventListener.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\ai-platform\fraud-ai-service\src\main\java\com\bank\ai\fraud\FraudAiServiceApplication.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\ai-platform\fraud-ai-service\src\main\java\com\bank\ai\fraud\model\RiskScore.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\ai-platform\fraud-ai-service\src\main\java\com\bank\ai\fraud\service\RiskScoringService.java

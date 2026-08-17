@@ -1,0 +1,468 @@
+# .github/workflows/ci.yml
+#
+# CI pipeline: triggered on every push and pull request.
+#
+# What it does:
+#   1. Build and test all Maven modules (fail-fast on compile/test error)
+#   2. Detect which services changed (path filters)
+#   3. For each changed service: build Docker image and push to ECR
+#      (only on push to main, not on PRs — avoids ECR image spam)
+#
+# Secrets required (set in repo Settings > Secrets and variables > Actions):
+#   AWS_CI_ROLE_ARN   — IAM role with ECR push and EKS read permissions (OIDC)
+#
+# Environment variables required (set as repository variables):
+#   AWS_REGION         — e.g., us-east-1
+#   ECR_REGISTRY       — e.g., 123456789012.dkr.ecr.us-east-1.amazonaws.com
+#   EKS_CLUSTER_NAME   — e.g., banking-dev-eks
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: "21"
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+jobs:
+  # ─── Step 1: Build and test all modules ──────────────────────────────────
+
+  build-and-test:
+    name: Maven build + test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Build and test all modules
+        run: mvn -B -q clean verify
+        # -B: batch mode (no interactive prompts)
+        # -q: quiet (only errors and summaries)
+        # verify: compile + test + package (but not install/deploy)
+
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: failure()   # only upload on failure to save storage
+        with:
+          name: test-reports
+          path: "**/target/surefire-reports/*.xml"
+          retention-days: 7
+
+  # ─── Step 2: Detect changed services ─────────────────────────────────────
+
+  detect-changes:
+    name: Detect changed services
+    runs-on: ubuntu-latest
+    outputs:
+      # Each output is "true" if that service's source changed
+      api-gateway:                      ${{ steps.filter.outputs.api-gateway }}
+      ai-orchestrator-service:          ${{ steps.filter.outputs.ai-orchestrator-service }}
+      account-service:                  ${{ steps.filter.outputs.account-service }}
+      rag-service:                      ${{ steps.filter.outputs.rag-service }}
+      mcp-gateway-service:              ${{ steps.filter.outputs.mcp-gateway-service }}
+      transfer-service:                 ${{ steps.filter.outputs.transfer-service }}
+      fraud-ai-service:                 ${{ steps.filter.outputs.fraud-ai-service }}
+      customer-service:                 ${{ steps.filter.outputs.customer-service }}
+      payment-service:                  ${{ steps.filter.outputs.payment-service }}
+      transaction-service:              ${{ steps.filter.outputs.transaction-service }}
+      card-service:                     ${{ steps.filter.outputs.card-service }}
+      loan-service:                     ${{ steps.filter.outputs.loan-service }}
+      notification-service:             ${{ steps.filter.outputs.notification-service }}
+      audit-service:                    ${{ steps.filter.outputs.audit-service }}
+      fraud-service:                    ${{ steps.filter.outputs.fraud-service }}
+      knowledge-service:                ${{ steps.filter.outputs.knowledge-service }}
+      document-intelligence-service:    ${{ steps.filter.outputs.document-intelligence-service }}
+      report-insight-service:           ${{ steps.filter.outputs.report-insight-service }}
+      # common module changes affect every service
+      common-changed:                   ${{ steps.filter.outputs.common }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect path changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            api-gateway:
+              - 'infrastructure/api-gateway/**'
+              - 'common/**'
+            ai-orchestrator-service:
+              - 'ai-platform/ai-orchestrator-service/**'
+              - 'ai-platform/ai-model-gateway/**'
+              - 'common/**'
+            account-service:
+              - 'banking-services/account-service/**'
+              - 'common/**'
+            rag-service:
+              - 'ai-platform/rag-service/**'
+              - 'common/**'
+            mcp-gateway-service:
+              - 'ai-platform/mcp-gateway-service/**'
+              - 'common/**'
+            transfer-service:
+              - 'banking-services/transfer-service/**'
+              - 'common/**'
+            fraud-ai-service:
+              - 'ai-platform/fraud-ai-service/**'
+              - 'common/**'
+            customer-service:
+              - 'banking-services/customer-service/**'
+              - 'common/**'
+            payment-service:
+              - 'banking-services/payment-service/**'
+              - 'common/**'
+            transaction-service:
+              - 'banking-services/transaction-service/**'
+              - 'common/**'
+            card-service:
+              - 'banking-services/card-service/**'
+              - 'common/**'
+            loan-service:
+              - 'banking-services/loan-service/**'
+              - 'common/**'
+            notification-service:
+              - 'banking-services/notification-service/**'
+              - 'common/**'
+            audit-service:
+              - 'banking-services/audit-service/**'
+              - 'common/**'
+            fraud-service:
+              - 'banking-services/fraud-service/**'
+              - 'common/**'
+            knowledge-service:
+              - 'ai-platform/knowledge-service/**'
+              - 'common/**'
+            document-intelligence-service:
+              - 'ai-platform/document-intelligence-service/**'
+              - 'common/**'
+            report-insight-service:
+              - 'ai-platform/report-insight-service/**'
+              - 'common/**'
+            common:
+              - 'common/**'
+
+  # ─── Step 3: Build Docker images for changed services (push to main only) ─
+
+  build-api-gateway:
+    name: Docker — api-gateway
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.api-gateway == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: api-gateway
+      module_path: infrastructure/api-gateway
+      jar_name: api-gateway
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/api-gateway
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}
+
+  build-account-service:
+    name: Docker — account-service
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.account-service == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: account-service
+      module_path: banking-services/account-service
+      jar_name: account-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/account-service
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}
+
+  build-customer-service:
+    name: Docker — customer-service
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.customer-service == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: customer-service
+      module_path: banking-services/customer-service
+      jar_name: customer-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/customer-service
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}
+
+  build-transfer-service:
+    name: Docker — transfer-service
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.transfer-service == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: transfer-service
+      module_path: banking-services/transfer-service
+      jar_name: transfer-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/transfer-service
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}
+
+  build-payment-service:
+    name: Docker — payment-service
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.payment-service == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: payment-service
+      module_path: banking-services/payment-service
+      jar_name: payment-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/payment-service
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}
+
+  build-transaction-service:
+    name: Docker — transaction-service
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.transaction-service == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: transaction-service
+      module_path: banking-services/transaction-service
+      jar_name: transaction-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/transaction-service
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}
+
+  build-card-service:
+    name: Docker — card-service
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.card-service == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: card-service
+      module_path: banking-services/card-service
+      jar_name: card-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/card-service
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}
+
+  build-loan-service:
+    name: Docker — loan-service
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.loan-service == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: loan-service
+      module_path: banking-services/loan-service
+      jar_name: loan-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/loan-service
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}
+
+  build-notification-service:
+    name: Docker — notification-service
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.notification-service == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: notification-service
+      module_path: banking-services/notification-service
+      jar_name: notification-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/notification-service
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}
+
+  build-audit-service:
+    name: Docker — audit-service
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.audit-service == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: audit-service
+      module_path: banking-services/audit-service
+      jar_name: audit-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/audit-service
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}
+
+  build-fraud-service:
+    name: Docker — fraud-service
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.fraud-service == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: fraud-service
+      module_path: banking-services/fraud-service
+      jar_name: fraud-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/fraud-service
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}
+
+  build-fraud-ai-service:
+    name: Docker — fraud-ai-service
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.fraud-ai-service == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: fraud-ai-service
+      module_path: ai-platform/fraud-ai-service
+      jar_name: fraud-ai-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/fraud-ai-service
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}
+
+  build-rag-service:
+    name: Docker — rag-service
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.rag-service == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: rag-service
+      module_path: ai-platform/rag-service
+      jar_name: rag-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/rag-service
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}
+
+  build-knowledge-service:
+    name: Docker — knowledge-service
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.knowledge-service == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: knowledge-service
+      module_path: ai-platform/knowledge-service
+      jar_name: knowledge-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/knowledge-service
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}
+
+  build-document-intelligence-service:
+    name: Docker — document-intelligence-service
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.document-intelligence-service == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: document-intelligence-service
+      module_path: ai-platform/document-intelligence-service
+      jar_name: document-intelligence-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/document-intelligence-service
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}
+
+  build-mcp-gateway-service:
+    name: Docker — mcp-gateway-service
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.mcp-gateway-service == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: mcp-gateway-service
+      module_path: ai-platform/mcp-gateway-service
+      jar_name: mcp-gateway-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/mcp-gateway-service
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}
+
+  build-ai-orchestrator-service:
+    name: Docker — ai-orchestrator-service
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.ai-orchestrator-service == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: ai-orchestrator-service
+      module_path: ai-platform/ai-orchestrator-service
+      jar_name: ai-orchestrator-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/ai-orchestrator-service
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}
+
+  build-report-insight-service:
+    name: Docker — report-insight-service
+    needs: [build-and-test, detect-changes]
+    if: |
+      github.event_name == 'push' &&
+      needs.detect-changes.outputs.report-insight-service == 'true'
+    uses: ./.github/workflows/reusable-build-push.yml
+    with:
+      service: report-insight-service
+      module_path: ai-platform/report-insight-service
+      jar_name: report-insight-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/report-insight-service
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      image_tag: ${{ github.sha }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_CI_ROLE_ARN }}

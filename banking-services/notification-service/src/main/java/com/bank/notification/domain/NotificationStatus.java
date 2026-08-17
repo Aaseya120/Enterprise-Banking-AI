@@ -1,0 +1,7 @@
+package com.bank.notification.domain;
+
+public enum NotificationStatus {
+    QUEUED,
+    SENT,
+    FAILED
+}

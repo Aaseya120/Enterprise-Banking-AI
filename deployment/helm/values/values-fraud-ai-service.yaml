@@ -1,0 +1,46 @@
+# values-fraud-ai-service.yaml
+nameOverride: fraud-ai-service
+fullnameOverride: fraud-ai-service
+
+image:
+  repository: # <account>.dkr.ecr.<region>.amazonaws.com/fraud-ai-service
+  tag: latest
+
+containerPort: 8085
+managementPort: 8086
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8085
+
+database:
+  enabled: false
+
+kafka:
+  enabled: true
+  bootstrapServers: ""  # MSK bootstrap endpoint
+
+# fraud-ai-service needs the HMAC secret (same value as transfer-service)
+# to sign the /fraud-decision callback request
+extraEnv:
+  - name: BANK_CRYPTO_FRAUD_DECISION_HMAC_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: fraud-ai-service-hmac-secret
+        key: fraud-decision-hmac-secret
+  - name: BANK_SERVICES_TRANSFER_SERVICE_BASE_URL
+    value: "http://transfer-service"
+
+replicaCount: 2
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 8
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    cpu: "2000m"
+    memory: "1Gi"

@@ -1,0 +1,49 @@
+# values-customer-service.yaml
+nameOverride: customer-service
+fullnameOverride: customer-service
+
+image:
+  repository: # <account>.dkr.ecr.<region>.amazonaws.com/customer-service
+  tag: latest
+
+containerPort: 8086
+managementPort: 8087
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8086
+
+database:
+  enabled: true
+  host: ""    # customer-db.xxxx.us-east-1.rds.amazonaws.com
+  port: 5432
+  name: customer_db
+  username: postgres
+  existingSecret: "customer-service-db-secret"
+  secretKey: "db-password"
+
+kafka:
+  enabled: false
+
+# customer-service uses AES-256-GCM to encrypt nationalId at rest.
+# The passphrase must be set here (via ExternalSecrets from AWS Secrets Manager).
+extraEnv:
+  - name: BANK_CRYPTO_ENCRYPTION_PASSPHRASE
+    valueFrom:
+      secretKeyRef:
+        name: customer-service-crypto-secret
+        key: encryption-passphrase
+
+replicaCount: 2
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 6
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"

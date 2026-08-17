@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.bank</groupId>
+    <artifactId>banking-ai-platform</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>document-intelligence-service</artifactId>
+  <packaging>jar</packaging>
+  <name>document-intelligence-service</name>
+  <description>
+    Document classification, structured field extraction, and confidence
+    scoring (plan section 22), with low-confidence results routed to a
+    human review queue rather than auto-accepted.
+
+    SCOPE NOTE: the full pipeline in the plan is Upload -> Virus scan ->
+    Object storage -> OCR/Parsing -> Classification -> Extraction ->
+    Validation -> Chunking -> Embedding -> Vector DB. This service picks up
+    at "Classification" -- it accepts already-extracted text (what a real
+    OCR/parsing step would hand off) rather than raw file bytes, because
+    virus scanning, object storage, and OCR all require external
+    infrastructure (ClamAV, S3/MinIO, Tesseract/Textract) not available in
+    this environment. Classification, regex-based structured extraction per
+    document type, heuristic confidence scoring, and the
+    low-confidence-to-human-review routing rule are all real, working logic
+    -- not stubs. See task.md for exactly what's simulated vs real.
+  </description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.bank</groupId>
+      <artifactId>common-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.bank</groupId>
+      <artifactId>common-exception</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-registry-prometheus</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-tracing-bridge-otel</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-exporter-zipkin</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>document-intelligence-service</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

@@ -1,0 +1,41 @@
+# values-transaction-service.yaml
+nameOverride: transaction-service
+fullnameOverride: transaction-service
+
+image:
+  repository: # <account>.dkr.ecr.<region>.amazonaws.com/transaction-service
+  tag: latest
+
+containerPort: 8088
+managementPort: 8089
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8088
+
+database:
+  enabled: true
+  host: ""    # transaction-db.xxxx.us-east-1.rds.amazonaws.com
+  port: 5432
+  name: transaction_db
+  username: postgres
+  existingSecret: "transaction-service-db-secret"
+  secretKey: "db-password"
+
+kafka:
+  enabled: true
+  bootstrapServers: ""  # MSK bootstrap endpoint
+
+replicaCount: 2
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 8
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"

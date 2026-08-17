@@ -1,0 +1,103 @@
+# .github/workflows/reusable-helm-deploy.yml
+#
+# Reusable workflow: deploy one service to EKS via Helm.
+# Called by cd.yml once per service that has a new image.
+
+name: Reusable — Helm Deploy to EKS
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        required: true
+        type: string
+      ecr_repo:
+        required: true
+        type: string
+      image_tag:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+        default: dev
+      aws_region:
+        required: true
+        type: string
+        default: us-east-1
+      eks_cluster_name:
+        required: true
+        type: string
+    secrets:
+      AWS_ROLE_ARN:
+        required: true
+
+jobs:
+  helm-deploy:
+    name: Deploy ${{ inputs.service }} → ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}   # requires GitHub Environment approval in prod
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Update kubeconfig for EKS
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ inputs.aws_region }} \
+            --name ${{ inputs.eks_cluster_name }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.15.3
+
+      - name: Helm upgrade --install
+        run: |
+          helm upgrade --install ${{ inputs.service }} \
+            deployment/helm/banking-microservice \
+            --namespace banking \
+            --create-namespace \
+            --values deployment/helm/values/values-${{ inputs.service }}.yaml \
+            --set image.repository=${{ inputs.ecr_repo }} \
+            --set image.tag=${{ inputs.image_tag }} \
+            --wait \
+            --timeout 5m \
+            --atomic   # roll back automatically on failure
+        env:
+          KUBECONFIG: $HOME/.kube/config
+
+      - name: Smoke test — wait for readiness
+        run: |
+          kubectl rollout status deployment/${{ inputs.service }} \
+            --namespace banking \
+            --timeout=120s
+
+      - name: Smoke test — health endpoint
+        run: |
+          # Port-forward and check /actuator/health/readiness returns 200
+          kubectl port-forward \
+            -n banking \
+            deployment/${{ inputs.service }} \
+            18080:$(kubectl get deployment ${{ inputs.service }} -n banking \
+              -o jsonpath='{.spec.template.spec.containers[0].ports[?(@.name=="management")].containerPort}') &
+          PF_PID=$!
+          sleep 5
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            http://localhost:18080/actuator/health/readiness)
+          kill $PF_PID
+          if [ "$STATUS" != "200" ]; then
+            echo "Health check failed (HTTP $STATUS)"
+            exit 1
+          fi
+          echo "Health check passed (HTTP $STATUS)"

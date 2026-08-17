@@ -1,0 +1,78 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "banking-microservice.fullname" . }}
+  labels:
+    {{- include "banking-microservice.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "banking-microservice.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    {{- if .Values.networkPolicy.allowFromGateway }}
+    # Allow HTTP traffic from the api-gateway pods (same namespace)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: api-gateway
+      ports:
+        - protocol: TCP
+          port: {{ .Values.containerPort }}
+    {{- end }}
+    # Allow Prometheus scraping of /actuator/prometheus from the monitoring namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.monitoringNamespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.managementPort }}
+    # Allow health probes from the kubelet (node CIDR) — required for
+    # liveness/readiness probes to work when NetworkPolicy is enabled.
+    # The kubelet runs on the node, not inside the cluster network, so
+    # we must explicitly allow it. We allow all sources on the management
+    # port rather than trying to enumerate node CIDRs (which vary per cluster).
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.managementPort }}
+  egress:
+    # Allow DNS resolution (CoreDNS in kube-system)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow outbound to any pod in the same namespace
+    # (service-to-service calls within the platform, e.g.
+    #  mcp-gateway-service -> account-service)
+    - to:
+        - podSelector: {}
+    # Allow outbound to the monitoring namespace (Zipkin trace export)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.monitoringNamespace }}
+    # Allow outbound to RDS / MSK (AWS managed services, outside the cluster)
+    # These run in private VPC subnets reachable via the cluster's VPC.
+    # Port 5432 = PostgreSQL (RDS), 9092 = Kafka (MSK plaintext),
+    # 9094 = Kafka (MSK TLS).
+    - ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 9094
+    # Allow HTTPS to AWS service endpoints (Secrets Manager, STS for IRSA)
+    - ports:
+        - protocol: TCP
+          port: 443
+{{- end }}

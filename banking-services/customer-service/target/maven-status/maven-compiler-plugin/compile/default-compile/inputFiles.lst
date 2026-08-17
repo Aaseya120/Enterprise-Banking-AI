@@ -1,0 +1,10 @@
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\customer-service\src\main\java\com\bank\customer\application\CustomerService.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\customer-service\src\main\java\com\bank\customer\controller\CustomerController.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\customer-service\src\main\java\com\bank\customer\CustomerServiceApplication.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\customer-service\src\main\java\com\bank\customer\domain\Customer.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\customer-service\src\main\java\com\bank\customer\domain\CustomerRepository.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\customer-service\src\main\java\com\bank\customer\domain\KycStatus.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\customer-service\src\main\java\com\bank\customer\dto\CustomerResponse.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\customer-service\src\main\java\com\bank\customer\dto\NationalIdResponse.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\customer-service\src\main\java\com\bank\customer\dto\RegisterCustomerRequest.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\customer-service\src\main\java\com\bank\customer\dto\UpdateKycStatusRequest.java

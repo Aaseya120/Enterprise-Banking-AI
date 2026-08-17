@@ -1,0 +1,283 @@
+# .github/workflows/cd.yml
+#
+# CD pipeline: deploy changed services to EKS after CI succeeds on main.
+#
+# Triggered by: successful completion of the CI workflow on main branch.
+# Each service is deployed independently — a single service change only
+# redeploys that service (using the image tag from CI's git SHA).
+#
+# GitHub Environments:
+#   "dev"  — no approval gate, deploys automatically
+#   "prod" — requires manual approval from a configured reviewer
+#
+# Repository variables required:
+#   AWS_REGION          — e.g., us-east-1
+#   ECR_REGISTRY        — e.g., 123456789012.dkr.ecr.us-east-1.amazonaws.com
+#   EKS_CLUSTER_NAME    — e.g., banking-dev-eks
+#   EKS_PROD_CLUSTER    — e.g., banking-prod-eks
+#
+# Secrets required:
+#   AWS_DEPLOY_ROLE_ARN — IAM role with EKS deploy + ECR pull permissions
+
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false  # never cancel an in-flight deploy
+
+jobs:
+  # Only proceed if CI passed
+  check-ci:
+    name: Check CI status
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      sha: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - run: echo "CI passed for ${{ github.event.workflow_run.head_sha }}"
+
+  # ─── Deploy each service that CI built an image for ──────────────────────
+  # Each deploy job is conditional: it only runs if the service's ECR image
+  # tag (git SHA) exists in ECR — a proxy for "CI built an image for this
+  # service in this run". A more precise approach would read CI's outputs
+  # via the GitHub API; this is the simpler production-ready approach.
+
+  deploy-api-gateway:
+    needs: check-ci
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: api-gateway
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/api-gateway
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  deploy-account-service:
+    needs: check-ci
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: account-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/account-service
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  deploy-customer-service:
+    needs: check-ci
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: customer-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/customer-service
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  deploy-transfer-service:
+    needs: [check-ci, deploy-account-service]  # account-service must be up first
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: transfer-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/transfer-service
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  deploy-payment-service:
+    needs: check-ci
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: payment-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/payment-service
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  deploy-transaction-service:
+    needs: [check-ci, deploy-payment-service, deploy-transfer-service]
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: transaction-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/transaction-service
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  deploy-card-service:
+    needs: check-ci
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: card-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/card-service
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  deploy-loan-service:
+    needs: check-ci
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: loan-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/loan-service
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  deploy-notification-service:
+    needs: check-ci
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: notification-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/notification-service
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  deploy-audit-service:
+    needs: check-ci
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: audit-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/audit-service
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  deploy-fraud-service:
+    needs: check-ci
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: fraud-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/fraud-service
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  deploy-fraud-ai-service:
+    needs: [check-ci, deploy-transfer-service]
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: fraud-ai-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/fraud-ai-service
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  deploy-rag-service:
+    needs: check-ci
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: rag-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/rag-service
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  deploy-knowledge-service:
+    needs: check-ci
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: knowledge-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/knowledge-service
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  deploy-document-intelligence-service:
+    needs: check-ci
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: document-intelligence-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/document-intelligence-service
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  deploy-mcp-gateway-service:
+    needs: [check-ci, deploy-account-service]
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: mcp-gateway-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/mcp-gateway-service
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  deploy-ai-orchestrator-service:
+    needs: [check-ci, deploy-rag-service, deploy-mcp-gateway-service]
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: ai-orchestrator-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/ai-orchestrator-service
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+  deploy-report-insight-service:
+    needs: [check-ci, deploy-transaction-service]
+    uses: ./.github/workflows/reusable-helm-deploy.yml
+    with:
+      service: report-insight-service
+      ecr_repo: ${{ vars.ECR_REGISTRY }}/banking-dev/report-insight-service
+      image_tag: ${{ needs.check-ci.outputs.sha }}
+      environment: dev
+      aws_region: ${{ vars.AWS_REGION || 'us-east-1' }}
+      eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}

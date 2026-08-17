@@ -1,0 +1,44 @@
+# values-report-insight-service.yaml
+nameOverride: report-insight-service
+fullnameOverride: report-insight-service
+
+image:
+  repository: # <account>.dkr.ecr.<region>.amazonaws.com/report-insight-service
+  tag: latest
+
+containerPort: 8096
+managementPort: 8097
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8096
+
+database:
+  enabled: true
+  host: ""    # report-db.xxxx.us-east-1.rds.amazonaws.com
+  port: 5432
+  name: report_db
+  username: postgres
+  existingSecret: "report-insight-service-db-secret"
+  secretKey: "db-password"
+
+kafka:
+  enabled: false
+
+extraEnv:
+  - name: BANK_SERVICES_TRANSACTION_SERVICE_BASE_URL
+    value: "http://transaction-service"
+
+replicaCount: 2
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 6
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "2000m"
+    memory: "2Gi"

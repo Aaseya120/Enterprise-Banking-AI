@@ -1,0 +1,16 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "banking-microservice.fullname" . }}
+  labels:
+    {{- include "banking-microservice.labels" . | nindent 4 }}
+spec:
+  # minAvailable: 1 — at least one pod must remain running during voluntary
+  # disruptions (node drain, rolling node upgrade, etc.). Works correctly
+  # with minReplicas: 2 from the HPA: 2 pods - 1 can be disrupted = 1 always up.
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "banking-microservice.selectorLabels" . | nindent 6 }}
+{{- end }}

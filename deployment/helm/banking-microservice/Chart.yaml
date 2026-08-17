@@ -1,0 +1,19 @@
+apiVersion: v2
+name: banking-microservice
+description: >
+  Reusable Helm chart for every deployable service in the Banking AI Platform.
+  Each service passes its own values-<service>.yaml to override the defaults
+  here — ports, replica counts, database config, Kafka bootstrap, etc.
+  The chart never needs to change when a new service is added; only a new
+  values file is needed.
+type: application
+version: 1.0.0
+appVersion: "1.0.0-SNAPSHOT"
+keywords:
+  - banking
+  - microservice
+  - spring-boot
+home: https://github.com/your-org/banking-ai-platform
+maintainers:
+  - name: Platform Team
+    email: platform@bank.com

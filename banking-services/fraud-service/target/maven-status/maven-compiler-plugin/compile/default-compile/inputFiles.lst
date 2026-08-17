@@ -1,0 +1,16 @@
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\fraud-service\src\main\java\com\bank\fraud\application\BlacklistAdminService.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\fraud-service\src\main\java\com\bank\fraud\application\FraudRuleEngine.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\fraud-service\src\main\java\com\bank\fraud\controller\BlacklistController.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\fraud-service\src\main\java\com\bank\fraud\controller\FraudEvaluationController.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\fraud-service\src\main\java\com\bank\fraud\domain\BlacklistEntry.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\fraud-service\src\main\java\com\bank\fraud\domain\BlacklistEntryRepository.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\fraud-service\src\main\java\com\bank\fraud\domain\EvaluationLog.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\fraud-service\src\main\java\com\bank\fraud\domain\EvaluationLogRepository.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\fraud-service\src\main\java\com\bank\fraud\domain\FraudEvaluationContext.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\fraud-service\src\main\java\com\bank\fraud\domain\FraudRule.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\fraud-service\src\main\java\com\bank\fraud\domain\rules\BlacklistRule.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\fraud-service\src\main\java\com\bank\fraud\domain\rules\ThresholdRule.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\fraud-service\src\main\java\com\bank\fraud\domain\rules\VelocityRule.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\fraud-service\src\main\java\com\bank\fraud\dto\AddBlacklistEntryRequest.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\fraud-service\src\main\java\com\bank\fraud\dto\FraudEvaluationRequest.java
+D:\Projects\Java_AI_Banking\Enterprise-Banking-AI\banking-services\fraud-service\src\main\java\com\bank\fraud\FraudServiceApplication.java

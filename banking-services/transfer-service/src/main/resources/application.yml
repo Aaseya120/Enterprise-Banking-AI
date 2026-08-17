@@ -1,0 +1,54 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: transfer-service
+  datasource:
+    url: jdbc:postgresql://transfer-db:5432/transfer_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+bank:
+  outbox:
+    poll-interval-ms: 2000
+  crypto:
+    # Shared secret with fraud-ai-service for HMAC-signing the
+    # /fraud-decision callback -- MUST be identical in both services'
+    # config, or every signature verification fails. Same demo-secret
+    # caveat as the gateway's JWT key and customer-service's encryption
+    # key: source this from Vault/Secrets Manager in a real deployment,
+    # never commit the real value.
+    fraud-decision-hmac-secret: "change-me-shared-fraud-decision-hmac-secret-0123456789"
+  services:
+    fraud-service-url: ${FRAUD_SERVICE_URL:http://fraud-service:8093}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  pattern:
+    level: "%5p [%X{correlationId},%X{traceId:-},%X{spanId:-}]"

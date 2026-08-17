@@ -1,0 +1,38 @@
+# values-mcp-gateway-service.yaml
+nameOverride: mcp-gateway-service
+fullnameOverride: mcp-gateway-service
+
+image:
+  repository: # <account>.dkr.ecr.<region>.amazonaws.com/mcp-gateway-service
+  tag: latest
+
+containerPort: 8083
+managementPort: 8084
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8083
+
+database:
+  enabled: false
+
+kafka:
+  enabled: false
+
+extraEnv:
+  - name: BANK_SERVICES_ACCOUNT_SERVICE_BASE_URL
+    value: "http://account-service"
+
+replicaCount: 2
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 6
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"

@@ -1,0 +1,40 @@
+# values-knowledge-service.yaml
+nameOverride: knowledge-service
+fullnameOverride: knowledge-service
+
+image:
+  repository: # <account>.dkr.ecr.<region>.amazonaws.com/knowledge-service
+  tag: latest
+
+containerPort: 8094
+managementPort: 8095
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8094
+
+database:
+  enabled: true
+  host: ""    # knowledge-db.xxxx.us-east-1.rds.amazonaws.com
+  port: 5432
+  name: knowledge_db
+  username: postgres
+  existingSecret: "knowledge-service-db-secret"
+  secretKey: "db-password"
+
+kafka:
+  enabled: false
+
+replicaCount: 2
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 4
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"

@@ -1,0 +1,10 @@
+com\bank\ai\mcp\tool\ToolInvocationResult.class
+com\bank\ai\mcp\McpGatewayServiceApplication.class
+com\bank\ai\mcp\tool\McpToolRegistry.class
+com\bank\ai\mcp\config\DownstreamClientsConfig.class
+com\bank\ai\mcp\controller\McpToolController.class
+com\bank\ai\mcp\tool\impl\GetCustomerAccountsTool.class
+com\bank\ai\mcp\client\AccountServiceClient.class
+com\bank\ai\mcp\tool\impl\GetAccountBalanceTool.class
+com\bank\ai\mcp\tool\McpTool.class
+com\bank\ai\mcp\controller\ToolInvokeRequest.class

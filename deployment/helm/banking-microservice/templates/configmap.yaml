@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "banking-microservice.fullname" . }}
+  labels:
+    {{- include "banking-microservice.labels" . | nindent 4 }}
+data:
+  # Spring profiles — set via values, default empty (uses application.yml defaults)
+  SPRING_PROFILES_ACTIVE: {{ .Values.springProfilesActive | default "" | quote }}
+
+  # Management server port (actuator on a separate port from the app)
+  MANAGEMENT_SERVER_PORT: {{ .Values.managementPort | quote }}
+
+  # Distributed tracing — Zipkin endpoint (service name is stable DNS in-cluster)
+  MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: "http://zipkin.monitoring.svc.cluster.local:9411/api/v2/spans"
+  MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
+
+  # Prometheus metrics exposure
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus,metrics"
+  MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: "always"
+  MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+
+  {{- if .Values.database.enabled }}
+  SPRING_DATASOURCE_URL: {{ include "banking-microservice.jdbcUrl" . | quote }}
+  SPRING_FLYWAY_ENABLED: "true"
+  SPRING_JPA_HIBERNATE_DDL_AUTO: "validate"
+  {{- end }}
+
+  {{- if .Values.kafka.enabled }}
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: {{ .Values.kafka.bootstrapServers | quote }}
+  # Default consumer group: release name (each service in each namespace gets
+  # its own group, so consumer offsets don't cross between dev/staging/prod)
+  SPRING_KAFKA_CONSUMER_GROUP_ID: {{ .Release.Name | quote }}
+  {{- end }}

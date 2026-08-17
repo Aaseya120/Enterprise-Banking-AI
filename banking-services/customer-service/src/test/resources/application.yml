@@ -1,0 +1,26 @@
+# Test-only override: Spring Boot puts src/test/resources ahead of
+# src/main/resources on the test classpath, so @SpringBootTest picks this
+# up instead of the Postgres config above. Tests run against in-memory H2
+# with Hibernate creating the schema directly (ddl-auto: update) and Flyway
+# disabled -- no live Postgres required to run `mvn test`. This is a
+# deliberate tradeoff (documented in task.md): it verifies business logic
+# against H2, not the exact Postgres schema Flyway would create. A stricter
+# setup would use Testcontainers to run integration tests against a real
+# throwaway Postgres instance; not implemented here.
+spring:
+  datasource:
+    url: jdbc:h2:mem:customerdb-test;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: update
+  flyway:
+    enabled: false
+  kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers}
+
+bank:
+  crypto:
+    national-id-key: "test-only-passphrase-not-used-outside-this-test-run"

@@ -1,0 +1,42 @@
+server:
+  port: 8094
+
+spring:
+  application:
+    name: knowledge-service
+  datasource:
+    url: jdbc:postgresql://knowledge-db:5432/knowledge_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+bank:
+  services:
+    rag-service-url: ${RAG_SERVICE_URL:http://rag-service:8082}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  pattern:
+    level: "%5p [%X{correlationId},%X{traceId:-},%X{spanId:-}]"

@@ -1,0 +1,111 @@
+# values-api-gateway.yaml — overrides for the API Gateway service
+# Usage: helm upgrade --install api-gateway ./deployment/helm/banking-microservice \
+#          -f deployment/helm/values/values-api-gateway.yaml \
+#          --namespace banking
+
+nameOverride: api-gateway
+fullnameOverride: api-gateway
+
+image:
+  repository: # replaced by CI/CD: <account>.dkr.ecr.<region>.amazonaws.com/api-gateway
+  tag: latest
+
+containerPort: 8000
+managementPort: 8001
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+# Only the api-gateway gets an Ingress (ALB) — all other services are ClusterIP-only
+ingress:
+  enabled: true
+  className: "alb"
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /actuator/health
+    # Uncomment and set your ACM cert ARN for HTTPS:
+    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:123456789012:certificate/xxxx
+    # alb.ingress.kubernetes.io/ssl-redirect: "443"
+  hosts:
+    - host: api.banking.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+replicaCount: 2
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 65
+
+# api-gateway is stateless (no DB, no Kafka)
+database:
+  enabled: false
+kafka:
+  enabled: false
+
+# api-gateway has spring-boot-starter-oauth2-resource-server; the Keycloak
+# profile is activated via SPRING_PROFILES_ACTIVE=keycloak for real auth
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: "default"
+  - name: MANAGEMENT_SERVER_PORT
+    value: "8001"
+  # Downstream service URLs (ClusterIP DNS in-cluster):
+  - name: BANK_SERVICES_CUSTOMER-SERVICE_BASE-URL
+    value: "http://customer-service"
+  - name: BANK_SERVICES_ACCOUNT-SERVICE_BASE-URL
+    value: "http://account-service"
+  - name: BANK_SERVICES_TRANSFER-SERVICE_BASE-URL
+    value: "http://transfer-service"
+  - name: BANK_SERVICES_PAYMENT-SERVICE_BASE-URL
+    value: "http://payment-service"
+  - name: BANK_SERVICES_TRANSACTION-SERVICE_BASE-URL
+    value: "http://transaction-service"
+  - name: BANK_SERVICES_CARD-SERVICE_BASE-URL
+    value: "http://card-service"
+  - name: BANK_SERVICES_LOAN-SERVICE_BASE-URL
+    value: "http://loan-service"
+  - name: BANK_SERVICES_NOTIFICATION-SERVICE_BASE-URL
+    value: "http://notification-service"
+  - name: BANK_SERVICES_AUDIT-SERVICE_BASE-URL
+    value: "http://audit-service"
+  - name: BANK_SERVICES_FRAUD-SERVICE_BASE-URL
+    value: "http://fraud-service"
+  - name: BANK_SERVICES_FRAUD-AI-SERVICE_BASE-URL
+    value: "http://fraud-ai-service"
+  - name: BANK_SERVICES_RAG-SERVICE_BASE-URL
+    value: "http://rag-service"
+  - name: BANK_SERVICES_MCP-GATEWAY-SERVICE_BASE-URL
+    value: "http://mcp-gateway-service"
+  - name: BANK_SERVICES_AI-ORCHESTRATOR-SERVICE_BASE-URL
+    value: "http://ai-orchestrator-service"
+  - name: BANK_SERVICES_KNOWLEDGE-SERVICE_BASE-URL
+    value: "http://knowledge-service"
+  - name: BANK_SERVICES_DOCUMENT-INTELLIGENCE-SERVICE_BASE-URL
+    value: "http://document-intelligence-service"
+  - name: BANK_SERVICES_REPORT-INSIGHT-SERVICE_BASE-URL
+    value: "http://report-insight-service"
+
+# api-gateway needs to reach all downstream services — override networkPolicy
+# so it is allowed to egress to any pod in the namespace
+networkPolicy:
+  enabled: true
+  allowFromGateway: false   # the gateway itself is the ingress source, not a target
+  monitoringNamespace: monitoring
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    cpu: "2000m"
+    memory: "1Gi"
+
+secrets:
+  jwtSigningKey: ""  # set via --set secrets.jwtSigningKey=... or ExternalSecrets in prod

@@ -1,0 +1,8 @@
+package com.bank.account.domain;
+
+public enum AccountType {
+    SAVINGS,
+    CURRENT,
+    FIXED_DEPOSIT,
+    LOAN
+}

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.bank</groupId>
+    <artifactId>banking-ai-platform</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>../../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>mcp-gateway-service</artifactId>
+  <packaging>jar</packaging>
+  <name>mcp-gateway-service</name>
+  <description>
+    Model Context Protocol tool server (section 16-17). Exposes a fixed
+    allowlist of named tools (getAccountBalance, getAccountsForCustomer, ...)
+    that the AI orchestrator can invoke. Every tool call is authorized and
+    delegated to the owning banking service's REST API -- the LLM never gets
+    direct database access, and financial WRITE operations are intentionally
+    not exposed as tools (they require explicit orchestrated flows with
+    OTP/strong-auth, per section 17).
+  </description>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.bank</groupId>
+      <artifactId>common-exception</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.bank</groupId>
+      <artifactId>common-security</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webflux</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-registry-prometheus</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-tracing-bridge-otel</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-exporter-zipkin</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>mcp-gateway-service</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+</project>

@@ -1,0 +1,37 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: fraud-ai-service
+  kafka:
+    bootstrap-servers: localhost:9092
+
+bank:
+  services:
+    transfer-service:
+      base-url: http://localhost:8084
+  crypto:
+    # MUST match transfer-service's bank.crypto.fraud-decision-hmac-secret
+    # exactly -- see TransferController's javadoc for what breaks if these
+    # two values ever drift apart.
+    fraud-decision-hmac-secret: "change-me-shared-fraud-decision-hmac-secret-0123456789"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  pattern:
+    level: "%5p [%X{correlationId},%X{traceId:-},%X{spanId:-}]"

@@ -1,0 +1,40 @@
+# values-audit-service.yaml
+nameOverride: audit-service
+fullnameOverride: audit-service
+
+image:
+  repository: # <account>.dkr.ecr.<region>.amazonaws.com/audit-service
+  tag: latest
+
+containerPort: 8092
+managementPort: 8093
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8092
+
+database:
+  enabled: true
+  host: ""    # audit-db.xxxx.us-east-1.rds.amazonaws.com
+  port: 5432
+  name: audit_db
+  username: postgres
+  existingSecret: "audit-service-db-secret"
+  secretKey: "db-password"
+
+kafka:
+  enabled: false
+
+replicaCount: 2
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 4
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"

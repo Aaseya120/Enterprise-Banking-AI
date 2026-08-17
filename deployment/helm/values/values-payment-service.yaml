@@ -1,0 +1,41 @@
+# values-payment-service.yaml
+nameOverride: payment-service
+fullnameOverride: payment-service
+
+image:
+  repository: # <account>.dkr.ecr.<region>.amazonaws.com/payment-service
+  tag: latest
+
+containerPort: 8087
+managementPort: 8088
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8087
+
+database:
+  enabled: true
+  host: ""    # payment-db.xxxx.us-east-1.rds.amazonaws.com
+  port: 5432
+  name: payment_db
+  username: postgres
+  existingSecret: "payment-service-db-secret"
+  secretKey: "db-password"
+
+kafka:
+  enabled: true
+  bootstrapServers: ""  # MSK bootstrap endpoint
+
+replicaCount: 2
+autoscaling:
+  minReplicas: 2
+  maxReplicas: 8
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"

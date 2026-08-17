@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:transferdb-test;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: update
+  flyway:
+    enabled: false
+  kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers}
+
+bank:
+  crypto:
+    fraud-decision-hmac-secret: "test-only-shared-secret-not-used-outside-this-test-run"
