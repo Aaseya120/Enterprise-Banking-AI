@@ -7,6 +7,7 @@ import com.bank.fraud.dto.FraudEvaluationRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.test.context.support.WithMockUser;
 
 import java.math.BigDecimal;
 
@@ -40,6 +41,7 @@ class FraudRuleEngineTest {
     }
 
     @Test
+    @WithMockUser(roles = "COMPLIANCE_OFFICER")
     void deniesATransactionInvolvingABlacklistedAccount() {
         blacklistAdminService.add(new AddBlacklistEntryRequest("ACC-BAD", "Known fraud ring"));
 

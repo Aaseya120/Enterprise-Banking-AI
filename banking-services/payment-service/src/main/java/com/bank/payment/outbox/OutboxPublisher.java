@@ -2,6 +2,7 @@ package com.bank.payment.outbox;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -17,7 +18,8 @@ public class OutboxPublisher {
     private final OutboxEventRepository outboxEventRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
 
-    public OutboxPublisher(OutboxEventRepository outboxEventRepository, KafkaTemplate<String, String> kafkaTemplate) {
+    public OutboxPublisher(OutboxEventRepository outboxEventRepository,
+                           @Qualifier("kafkaStringTemplate") KafkaTemplate<String, String> kafkaTemplate) {
         this.outboxEventRepository = outboxEventRepository;
         this.kafkaTemplate = kafkaTemplate;
     }

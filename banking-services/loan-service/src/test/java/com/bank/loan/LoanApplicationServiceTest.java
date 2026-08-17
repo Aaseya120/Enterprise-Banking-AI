@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.kafka.test.context.EmbeddedKafka;
+import org.springframework.security.test.context.support.WithMockUser;
 
 import java.math.BigDecimal;
 
@@ -36,6 +37,7 @@ class LoanApplicationServiceTest {
     }
 
     @Test
+    @WithMockUser(roles = "BANK_STAFF")
     void emiIsComputedCorrectlyOnApproval() {
         LoanResponse applied = loanService.apply(new ApplyLoanRequest(
                 "CUST-2", "ACC-2", "HOME",
@@ -51,6 +53,7 @@ class LoanApplicationServiceTest {
     }
 
     @Test
+    @WithMockUser(roles = "BANK_STAFF")
     void fullLifecycleApplyApproveDisburseThenRepayToClose() {
         BigDecimal principal = new BigDecimal("1200.00");
         LoanResponse applied = loanService.apply(new ApplyLoanRequest(
@@ -71,6 +74,7 @@ class LoanApplicationServiceTest {
     }
 
     @Test
+    @WithMockUser(roles = "BANK_STAFF")
     void rejectedLoanCannotBeApproved() {
         LoanResponse applied = loanService.apply(new ApplyLoanRequest(
                 "CUST-4", "ACC-4", "AUTO",

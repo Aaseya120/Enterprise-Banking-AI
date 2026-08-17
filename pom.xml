@@ -108,6 +108,22 @@
           <groupId>org.springframework.boot</groupId>
           <artifactId>spring-boot-maven-plugin</artifactId>
           <version>${spring-boot.version}</version>
+          <configuration>
+            <!--
+              Keep the original thin JAR as the primary Maven artifact.
+              Without this, Spring Boot's repackage goal REPLACES the thin JAR
+              with the fat (executable) JAR. Maven Surefire's forked test JVM
+              then picks up the fat JAR on the classpath; classes inside
+              BOOT-INF/classes/ are invisible to the standard classloader, so
+              every @SpringBootTest fails with NoClassDefFoundError on domain /
+              entity classes (e.g. TransferStatus, PaymentStatus …) and
+              ApplicationContext cannot start.
+              With classifier=exec the executable fat JAR is written alongside
+              the thin JAR as <artifactId>-exec.jar, the thin JAR remains the
+              primary install artifact, and tests see a normal classpath.
+            -->
+            <classifier>exec</classifier>
+          </configuration>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>

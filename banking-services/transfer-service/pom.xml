@@ -115,19 +115,6 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
-        <configuration>
-          <!--
-            Keep the original thin JAR as the primary Maven artifact so that
-            Maven Surefire's forked test JVM loads classes from target/classes
-            (normal classpath) rather than from the repackaged fat JAR.
-            Without this, Spring Boot replaces the thin JAR in-place and the
-            forked JVM sees an executable fat JAR on the classpath, causing
-            NoClassDefFoundError for domain classes (e.g. TransferStatus) during
-            Hibernate entity scanning.  The runnable fat JAR is still produced
-            under the "exec" classifier (transfer-service-exec.jar).
-          -->
-          <classifier>exec</classifier>
-        </configuration>
       </plugin>
     </plugins>
   </build>
