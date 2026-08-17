@@ -1,38 +1,42 @@
-# Enterprise Banking AI Platform Architecture
+# 🏛️ Enterprise Banking AI Platform Architecture
 
-This document provides a comprehensive overview of the architecture of the Enterprise Banking AI Platform.
+This document provides a clear, high-level overview of how the **Enterprise Banking AI Platform** is structured. 
 
-## 1. High-Level Architecture
+The architecture is built around a fundamental rule: **Keep the AI smart, but keep the banking secure.** To achieve this, the system is strictly divided into two distinct environments (planes).
 
-The system is designed with a clear separation of concerns, divided into two primary planes:
-- **Banking Services Plane**: Traditional, transactional microservices handling core banking capabilities (accounts, transfers, payments, etc.).
-- **AI Intelligence Plane**: Services dedicated to AI capabilities (RAG, multi-LLM orchestration, document intelligence) that interact with the banking plane only through controlled APIs and events.
+---
+
+## 1. The Two-Plane Architecture
+
+1. **🏦 Banking Services Plane**: Traditional, transactional microservices that handle the core banking capabilities (accounts, money transfers, payments, card issuance, etc.).
+2. **🧠 AI Intelligence Plane**: Specialized services that handle Generative AI routing, Retrieval-Augmented Generation (RAG), and document intelligence.
+
+These planes *never* share a database. The AI plane can only interact with the Banking plane through tightly controlled, read-only APIs via the API Gateway.
+
+### Architecture Diagram
 
 ```mermaid
 graph TD
     Client[Client Applications] --> APIGateway[API Gateway]
     
-    subgraph "Banking Services Plane"
+    subgraph "🏦 Banking Services Plane"
         Customer[Customer Service]
         Account[Account Service]
         Transfer[Transfer Service]
         Payment[Payment Service]
         Transaction[Transaction Service]
-        Card[Card Service]
-        Loan[Loan Service]
         Fraud[Fraud Service]
     end
 
-    subgraph "AI Intelligence Plane"
+    subgraph "🧠 AI Intelligence Plane"
         AiOrchestrator[AI Orchestrator]
         RagService[RAG Service]
         McpGateway[MCP Gateway]
         DocumentIntel[Document Intelligence]
         FraudAi[Fraud AI Service]
-        ReportInsight[Report Insight Service]
     end
     
-    subgraph "Data & Event Streaming"
+    subgraph "🔄 Data & Event Streaming"
         Kafka[Kafka Event Bus]
         Postgres[(PostgreSQL per Service)]
     end
@@ -44,85 +48,75 @@ graph TD
     
     AiOrchestrator --> RagService
     AiOrchestrator --> McpGateway
-    McpGateway -. "REST API" .-> Account
+    McpGateway -. "Secure REST API" .-> Account
     
     Transfer --> Kafka
     Kafka --> FraudAi
     FraudAi -. "HMAC Callback" .-> Transfer
 ```
 
-## 2. Core Architectural Patterns
+---
 
-### 2.1 Database-per-Service
-Every stateful service (13 in total) owns a dedicated PostgreSQL database.
-- **No Shared Databases**: Services cannot query another service's database directly.
-- **Schema Management**: Flyway handles all DDL operations. Hibernate is configured to `validate` only, ensuring that it never silently alters tables in production.
+## 2. Core Design Principles
 
-### 2.2 Event-Driven Architecture & Sagas
-The platform leverages Apache Kafka for asynchronous communication and eventual consistency.
-- **Transactional Outbox**: Used by `transfer-service` and `payment-service`. Database changes and event generation are committed in a single local transaction to an outbox table. A separate poller then publishes these to Kafka.
-- **Saga Pattern**: The transfer process uses a saga to incorporate asynchronous AI fraud checks:
-  1. `transfer-service` initiates a transfer (status: `PENDING_FRAUD_REVIEW`).
-  2. Event published to Kafka.
-  3. `fraud-ai-service` consumes the event and scores the risk.
-  4. `fraud-ai-service` calls back `transfer-service` via an HMAC-signed REST endpoint to approve or reject the transfer.
-- **Idempotency**: Consumers (like `transaction-service` and `notification-service`) handle duplicate events safely by deduplicating on reference IDs or event IDs.
+### 📦 Database-per-Service
+We strictly follow the microservices database-per-service pattern. There are 13 stateful services, and each one gets its own dedicated PostgreSQL database.
+- Services cannot directly query another service's tables.
+- Database schemas are strictly managed and versioned using **Flyway**.
 
-### 2.3 Security Architecture
-- **API Gateway & JWT**: All external traffic flows through the API Gateway, which enforces JWT validation. It supports both a local demo JWT issuer and a real Keycloak OAuth2 configuration.
-- **Identity Propagation**: The gateway strips any incoming `X-User-Id` or `X-User-Roles` headers to prevent spoofing, and injects trusted headers downstream based on the verified JWT claims.
-- **Downstream RBAC**: Downstream services use a `TrustedIdentityFilter` to reconstruct the Spring Security context, enabling strict `@PreAuthorize` rules on sensitive endpoints (e.g., loan approval).
-- **Encryption at Rest**: PII (like `nationalId` in `customer-service`) is encrypted at rest using AES-256-GCM via the zero-dependency `common-crypto` module.
-- **Service-to-Service Trust**: Sensitive callbacks (like the fraud saga callback) are secured using HMAC-SHA256 signatures to prevent unauthorized direct access.
+### 📨 Event-Driven Sagas & Outbox Pattern
+We use **Apache Kafka** to ensure reliability and eventual consistency across financial operations.
+- **Transactional Outbox**: When a user makes a transfer, the database update and the Kafka event are saved in the same local transaction. A poller then reliably publishes the event to Kafka.
+- **AI Fraud Saga**: When a transfer is initiated, it stays `PENDING`. An event is sent to Kafka, consumed by the `fraud-ai-service` for risk scoring, and then the AI service securely calls back to the transfer service to finalize the transaction.
 
-### 2.4 AI Integration Guardrails
-- **No Direct DB Access**: AI services do not have database credentials to banking services.
-- **Read-Only Tools**: Model Context Protocol (MCP) tools exposed to the LLM (e.g., checking balance) are strictly read-only by design. No financial write is exposed as an AI tool.
-- **Aggregation First**: The `report-insight-service` pre-aggregates ledger data before sending it to the LLM, structurally preventing raw transaction data from entering the prompt.
-- **Circuit Breakers**: Synchronous AI calls (e.g., to RAG or MCP tools) are protected by Resilience4j circuit breakers with defined fallback behaviors.
+### 🔐 Zero-Trust Security
+Security is baked into the foundation:
+- **API Gateway**: All traffic goes through Spring Cloud Gateway, which validates JWTs (via a local issuer or Keycloak).
+- **PII Encryption**: Personally Identifiable Information (like National IDs) is encrypted at rest using AES-256-GCM.
+- **HMAC Signatures**: Internal service-to-service callbacks (like the Fraud AI approving a transfer) are cryptographically signed using HMAC-SHA256 to prevent internal spoofing.
+
+### 🤖 AI Guardrails
+- **Read-Only Tools**: The AI uses Model Context Protocol (MCP) to access banking data, but these tools are structurally read-only. The AI cannot initiate a money transfer.
+- **Pre-Aggregation**: When asking the AI to summarize account activity, the `report-insight-service` aggregates the raw ledger data *before* sending it to the LLM, ensuring raw transaction histories never enter the prompt.
+
+---
 
 ## 3. Technology Stack
 
-- **Language & Framework**: Java 21, Spring Boot 3.3, Spring Cloud
-- **Data**: PostgreSQL 16, H2 (for tests), Flyway, Spring Data JPA
-- **Messaging**: Apache Kafka, Zookeeper
-- **AI/LLM**: Integrations with OpenAI, Anthropic (Claude), Google (Gemini) via HTTP clients, vector store abstraction (in-memory implementation).
-- **Observability**: Micrometer, Prometheus, Zipkin (OpenTelemetry), Grafana
-- **Deployment**: Docker Compose (local), Helm & Kubernetes (production), Terraform (AWS infrastructure)
+| Category | Technologies Used |
+|----------|-------------------|
+| **Core Framework** | Java 21, Spring Boot 3.3, Spring Cloud |
+| **Data & Storage** | PostgreSQL 16, Spring Data JPA, Flyway, H2 (for tests) |
+| **Event Streaming** | Apache Kafka, Zookeeper |
+| **Generative AI** | OpenAI, Anthropic (Claude), Google (Gemini) APIs, In-Memory Vector Store |
+| **Observability** | Micrometer, Prometheus, Zipkin (OpenTelemetry), Grafana |
+| **Infrastructure** | Docker Compose, Helm (Kubernetes), Terraform (AWS) |
+
+---
 
 ## 4. Module Breakdown
 
-### 4.1 Common Modules (`/common`)
-- `common-api`: Shared DTOs and interfaces.
-- `common-exception`: Standardized error handling and problem details.
-- `common-security`: Downstream RBAC, JWT filters, PII masking.
-- `common-events`: Kafka event envelopes.
-- `common-crypto`: Zero-dependency module for AES-256-GCM encryption and HMAC-SHA256 signing.
+### 🛠️ Common Libraries (`/common`)
+Reusable code shared across microservices to prevent duplication.
+- `common-api`, `common-exception`, `common-security`, `common-events`, `common-crypto`
 
-### 4.2 Banking Services (`/banking-services`)
-- `account-service`: Account management and balances.
-- `customer-service`: KYC and customer profiles (with encrypted PII).
-- `transfer-service`: Fund transfers with outbox and saga patterns.
-- `payment-service`: Payment lifecycle with idempotency-key deduplication.
-- `transaction-service`: Immutable ledger consuming events.
-- `card-service`: Tokenized card issuance and lifecycle management.
-- `loan-service`: Loan application, eligibility checking, and repayment.
-- `fraud-service`: Deterministic business rules engine (synchronous pre-check).
-- `notification-service`: Idempotent event dispatch.
-- `audit-service`: Append-only audit trail with automatic data redaction.
+### 🏦 Banking Services (`/banking-services`)
+The core financial ledger.
+- `account-service`, `customer-service`, `transfer-service`, `payment-service`, `transaction-service`, `card-service`, `loan-service`, `fraud-service`, `notification-service`, `audit-service`
 
-### 4.3 AI Platform (`/ai-platform`)
-- `ai-orchestrator-service`: Intent detection, RAG/MCP routing, prompt construction, and response handling.
-- `mcp-gateway-service`: MCP tool registry exposing banking APIs to AI safely.
-- `rag-service`: Vector store and retrieval filtering based on ACLs.
-- `knowledge-service`: Document metadata and full version history lifecycle.
-- `document-intelligence-service`: Keyword classification and regex-based structured field extraction.
-- `fraud-ai-service`: Async Kafka consumer for transfer risk scoring.
-- `report-insight-service`: Generates AI narratives from pre-aggregated account metrics.
-- `ai-model-gateway`: Shared library for provider-independent LLM routing.
+### 🧠 AI Platform (`/ai-platform`)
+The intelligent layer orchestrating language models.
+- `ai-orchestrator-service` (The brain routing requests)
+- `mcp-gateway-service` (Safe tool execution)
+- `rag-service` & `knowledge-service` (Document retrieval and storage)
+- `document-intelligence-service` (Document classification and OCR processing)
+- `fraud-ai-service` (Kafka consumer for async risk scoring)
+- `report-insight-service` (Generates financial narrative summaries)
+- `ai-model-gateway` (Provider-agnostic LLM client library)
 
-### 4.4 Infrastructure & Deployment
-- `infrastructure/api-gateway`: Spring Cloud Gateway handling routing and JWT enforcement.
-- `deployment/docker`: Complete `docker-compose.yml` for all 19 services, 13 databases, Kafka, and observability stack.
-- `deployment/helm`: Kubernetes deployment manifests (`banking-microservice` chart).
-- `infrastructure/terraform`: AWS provisioning scripts (VPC, EKS, RDS, MSK, etc.).
+### 🚀 Infrastructure & Deployment (`/infrastructure`, `/deployment`)
+Everything needed to run the platform locally or in the cloud.
+- `infrastructure/api-gateway` (Spring Cloud Gateway)
+- `deployment/docker` (Local Docker Compose stack)
+- `deployment/helm` (Kubernetes deployment manifests)
+- `infrastructure/terraform` (AWS provisioning blueprints)

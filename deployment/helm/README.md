@@ -1,97 +1,98 @@
-# Helm Deployment Guide
+# ☸️ Helm Deployment Guide
 
-## Overview
+Welcome to the Kubernetes deployment guide! We use **Helm** and **Helmfile** to manage the deployment of all 19 microservices in a clean, declarative way.
 
-One reusable chart (`banking-microservice`) drives all 19 deployable services.
-Per-service customisation lives exclusively in `values/values-<service>.yaml`.
-`helmfile.yaml` orchestrates the full stack with explicit dependency ordering.
+## 🌟 Overview
 
-## Prerequisites
+Instead of maintaining 19 different Helm charts, we use **one reusable chart** called `banking-microservice`. 
+Each individual service simply provides its own custom configuration values in the `values/values-<service>.yaml` file. 
+
+The entire stack, along with its dependency ordering, is orchestrated by `helmfile.yaml`.
+
+---
+
+## 🛠️ Prerequisites
+
+Before you start, make sure you have Helm and Helmfile installed:
 
 ```bash
 brew install helmfile helm
-helmfile init   # installs helm-diff and helm-secrets plugins
+helmfile init   # Installs required helm-diff and helm-secrets plugins
 ```
 
-For AWS EKS:
+*If deploying to AWS EKS, configure your kubeconfig:*
 ```bash
 aws eks update-kubeconfig --region us-east-1 --name banking-platform-dev
 ```
 
-## Install the full stack
+---
 
+## 🚀 Quick Start: Deploying the Stack
+
+Navigate to the Helm directory:
 ```bash
 cd deployment/helm
+```
 
-# Development (local kind/minikube — or point kubeconfig at EKS dev cluster)
+**For Local Development** *(minikube/kind or EKS dev)*:
+```bash
 helmfile sync
+```
 
-# Production
+**For Production**:
+```bash
 helmfile -e prod sync
 ```
 
-## Install / upgrade a single service
+---
 
+## 🎯 Common Commands
+
+### Deploy or Upgrade a Single Service
 ```bash
 helmfile -l name=account-service apply
 ```
 
-## Render templates without installing (dry-run)
-
+### Dry-Run (See what will be generated without deploying)
 ```bash
 helm template account-service ./banking-microservice \
   -f values/values-account-service.yaml \
   --namespace banking
 ```
 
-## Rolling back a service
-
+### Rollback a Service
 ```bash
-helm history account-service -n banking        # list revisions
-helm rollback account-service 2 -n banking     # roll back to revision 2
+helm history account-service -n banking        # List all revisions
+helm rollback account-service 2 -n banking     # Roll back to revision 2
 ```
 
-## Secrets handling
+---
 
-In development, secret values can be passed directly:
-```bash
-helmfile sync --set "database.password=yourpassword"
-```
+## 🔐 Secrets Management
 
-In production, use [External Secrets Operator](https://external-secrets.io/) to
-sync secrets from AWS Secrets Manager into Kubernetes Secrets, then set
-`database.existingSecret` to the pre-created secret name. No secret values
-ever appear in Helm values files committed to source control.
+We take security seriously. **No passwords or secret values are ever committed to source control.**
 
-## Adding a new service
+- **Development**: Pass secrets securely via command line:
+  ```bash
+  helmfile sync --set "database.password=your_secure_password"
+  ```
+- **Production**: We use the [External Secrets Operator](https://external-secrets.io/) to seamlessly sync secrets from AWS Secrets Manager directly into Kubernetes Secrets.
 
-1. Create `values/values-<new-service>.yaml` (copy an existing file, adjust ports/DB/Kafka)
-2. Add a release block to `helmfile.yaml` with appropriate `needs:`
-3. Add the service to `infrastructure/terraform/modules/ecr/main.tf` (new ECR repo)
-4. Add the service to `.github/workflows/ci.yml` path-filter list
+---
 
-No changes to the chart itself are needed.
+## 🛡️ Security & Reliability Policies
 
-## NetworkPolicy
+By default, our Helm charts enforce strict policies:
 
-The chart enables NetworkPolicy by default. This means:
-- **Only the `api-gateway` pod** can reach a service on its app port (closes the
-  direct-access hole documented in task.md)
-- **Prometheus** (in the `monitoring` namespace) can scrape `/actuator/prometheus`
-  on the management port
-- **Kubelet health probes** are allowed on the management port
-- **Egress** is allowed to DNS (port 53), same-namespace pods, monitoring namespace,
-  RDS (5432), MSK Kafka (9092/9094), and AWS HTTPS endpoints (443)
+1. **Network Policies**:
+   - Only the `api-gateway` pod can communicate with microservices on their main application ports.
+   - Egress (outbound traffic) is strictly limited to necessary endpoints (DNS, Kafka, RDS, etc.).
+2. **High Availability**:
+   - Every service is configured with a Horizontal Pod Autoscaler (HPA) and a Pod Disruption Budget (PDB) to ensure zero-downtime during node upgrades.
 
-To disable NetworkPolicy for debugging:
+*To temporarily disable Network Policies for local debugging:*
 ```bash
 helm upgrade <service> ./banking-microservice \
   -f values/values-<service>.yaml \
   --set networkPolicy.enabled=false
 ```
-
-## HPA and Pod Disruption Budget
-
-Every service gets an HPA (CPU + memory) and a PDB (`minAvailable: 1`) by default.
-Scale-down is conservative (1 pod per 60s, 5-minute stabilisation window) to avoid
-traffic impact from autoscaler thrashing.
