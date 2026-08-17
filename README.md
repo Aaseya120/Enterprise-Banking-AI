@@ -4,6 +4,10 @@ A Spring Boot multi-module implementation of the Java + AI banking architecture:
 existing banking services on one plane, an AI intelligence plane (RAG, MCP,
 multi-LLM gateway) on the other, connected only through controlled APIs.
 
+> [!NOTE]
+> 📖 **See [ARCHITECTURE.md](ARCHITECTURE.md) for a complete overview of the architecture, module breakdown, and design patterns.**
+
+
 ## What's actually implemented here
 
 This is a **working scaffold**, not a claim that every one of the ~20 services
